@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Doña Metiche — Salsas Artesanales</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyB2kHzrWrHVjflYnarEvL9UmX4nMFcfBGI",
+    authDomain: "salsa-dona-metiche.firebaseapp.com",
+    databaseURL: "https://salsa-dona-metiche-default-rtdb.firebaseio.com",
+    projectId: "salsa-dona-metiche",
+    storageBucket: "salsa-dona-metiche.firebasestorage.app",
+    messagingSenderId: "598569874314",
+    appId: "1:598569874314:web:41216b2f24f9181acf8e73"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  const CATALOGO_BASE = [
+    {id:'MOR-235',nombre:'Morita 235 ml',receta:'Morita',ml:235,precio:100},
+    {id:'MOR-120',nombre:'Morita 120 ml',receta:'Morita',ml:120,precio:60},
+    {id:'MOR-29', nombre:'Morita 29 ml', receta:'Morita',ml:29, precio:25},
+    {id:'HAB-235',nombre:'Habanero 235 ml',receta:'Habanero',ml:235,precio:100},
+    {id:'HAB-120',nombre:'Habanero 120 ml',receta:'Habanero',ml:120,precio:60},
+    {id:'HAB-29', nombre:'Habanero 29 ml', receta:'Habanero',ml:29, precio:25},
+    {id:'ARL-235',nombre:'Chile de árbol 235 ml',receta:'Chile de árbol',ml:235,precio:100},
+    {id:'ARL-120',nombre:'Chile de árbol 120 ml',receta:'Chile de árbol',ml:120,precio:60},
+    {id:'ARL-29', nombre:'Chile de árbol 29 ml', receta:'Chile de árbol',ml:29, precio:25},
+  ];
+
+  const RECETA_INFO = {
+    'Morita': {
+      tagline: 'Ahumado profundo, dulzor de brasa',
+      descripcion: 'Chile morita secado al humo, macerado lentamente para revelar notas tostadas y un dulzor terroso que envuelve cada gota.',
+      color: '#7a2a10'
+    },
+    'Habanero': {
+      tagline: 'Calor floral, intensidad limpia',
+      descripcion: 'Habanero fresco de la península, con un picor brillante y aromático que florece antes de quemar.',
+      color: '#6b3c06'
+    },
+    'Chile de árbol': {
+      tagline: 'Picante directo, herbal y vivo',
+      descripcion: 'Chile de árbol tostado a fuego lento, picor franco y persistente con un fondo herbal característico.',
+      color: '#234a08'
+    }
+  };
+
+  let inventario = {};
+  let productos = CATALOGO_BASE.map(p => ({...p}));
+  let fotosProductos = {};
+  let quienesSomos = {
+    titulo: "Salsa hecha como en casa, vendida como joyería",
+    parrafo1: "Doña Metiche nació en una cocina familiar, entre frascos hirviendo y recetas que pasaban de mano en mano sin escribirse en ningún lado. Cada lote se sigue haciendo igual: chiles seleccionados uno por uno, tueste lento, y el mismo cuidado de siempre.",
+    parrafo2: "No hacemos salsa para llenar un anaquel. Hacemos salsa para que la primera cucharada te haga preguntar quién la hizo.",
+    parrafo3: "Hoy seguimos siendo un negocio pequeño y artesanal — eso es exactamente lo que queremos seguir siendo."
+  };
+
+  window._app = { inventario, productos, fotosProductos, quienesSomos };
+
+  function iniciarSuscripciones(){
+    onValue(ref(db,'inventario'), snap => {
+      inventario = snap.val() || {};
+      window._app.inventario = inventario;
+      if (window.renderCatalogo) window.renderCatalogo();
+      if (window.renderProductoActivo) window.renderProductoActivo();
+    });
+    onValue(ref(db,'tienda/fotos'), snap => {
+      fotosProductos = snap.val() || {};
+      window._app.fotosProductos = fotosProductos;
+      if (window.renderCatalogo) window.renderCatalogo();
+      if (window.renderProductoActivo) window.renderProductoActivo();
+    });
+    onValue(ref(db,'tienda/quienesSomos'), snap => {
+      const data = snap.val();
+      if (data) {
+        quienesSomos = data;
+        window._app.quienesSomos = quienesSomos;
+        if (window.renderQuienesSomos) window.renderQuienesSomos();
+      }
+    });
+  }
+
+  window._RECETA_INFO = RECETA_INFO;
+  window._PRODUCTOS = productos;
+  document.addEventListener('DOMContentLoaded', () => {
+    iniciarSuscripciones();
+    if (window.appInit) window.appInit();
+  });
+</script>
+
+<style>
+:root{
+  --negro:#0A0A0A;
+  --carbon:#1C1C1A;
+  --blanco:#FAFAF8;
+  --crema:#F3EFE7;
+  --dorado:#C9A227;
+  --dorado-claro:#E0C158;
+  --rojo:#8B1A1A;
+  --gris:#6B6862;
+  --gris-claro:#D8D4CC;
+  --serif:'Fraunces',serif;
+  --sans:'Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--sans);
+  background:var(--blanco);
+  color:var(--carbon);
+  line-height:1.5;
+  overflow-x:hidden;
+}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer}
+img{display:block;max-width:100%}
+
+/* ───── HEADER ───── */
+.site-header{
+  position:fixed;top:0;left:0;right:0;z-index:1000;
+  background:rgba(10,10,10,0.92);
+  backdrop-filter:blur(12px);
+  border-bottom:1px solid rgba(201,162,39,0.15);
+  transition:all .3s;
+}
+.header-inner{
+  max-width:1320px;margin:0 auto;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 32px;
+}
+.logo-mark{
+  font-family:var(--serif);font-size:22px;font-weight:500;
+  color:var(--blanco);letter-spacing:0.3px;
+  display:flex;align-items:center;gap:10px;
+}
+.logo-seal{
+  width:30px;height:30px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, var(--dorado-claro), var(--dorado) 60%, #8a6f15 100%);
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;color:var(--negro);font-weight:700;
+  box-shadow:0 0 0 1px rgba(201,162,39,.4), 0 2px 8px rgba(0,0,0,.4);
+}
+.nav-links{display:flex;gap:36px;align-items:center}
+.nav-link{
+  font-size:13px;letter-spacing:1.2px;text-transform:uppercase;
+  color:rgba(250,250,248,0.7);font-weight:500;
+  transition:color .2s;position:relative;
+}
+.nav-link:hover{color:var(--dorado-claro)}
+.nav-cart{
+  display:flex;align-items:center;gap:8px;
+  color:var(--blanco);font-size:13px;letter-spacing:0.5px;
+  border:1px solid rgba(201,162,39,0.4);padding:9px 18px;
+  border-radius:2px;transition:all .25s;background:transparent;
+}
+.nav-cart:hover{border-color:var(--dorado);background:rgba(201,162,39,0.08)}
+.cart-count{
+  background:var(--dorado);color:var(--negro);
+  font-size:11px;font-weight:700;
+  width:18px;height:18px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+}
+.burger{display:none;background:none;border:none;color:var(--blanco);font-size:24px}
+
+/* ───── HERO ───── */
+.hero{
+  min-height:100vh;display:flex;align-items:center;
+  background:var(--negro);position:relative;overflow:hidden;
+  padding:120px 32px 80px;
+}
+.hero::before{
+  content:'';position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse 60% 50% at 80% 20%, rgba(139,26,26,0.18), transparent),
+    radial-gradient(ellipse 50% 40% at 10% 80%, rgba(201,162,39,0.1), transparent);
+  pointer-events:none;
+}
+.hero-inner{
+  max-width:1320px;margin:0 auto;width:100%;
+  display:grid;grid-template-columns:1.1fr 0.9fr;gap:60px;align-items:center;
+  position:relative;z-index:2;
+}
+.hero-eyebrow{
+  color:var(--dorado);font-size:12px;letter-spacing:3px;
+  text-transform:uppercase;margin-bottom:24px;font-weight:600;
+  display:flex;align-items:center;gap:12px;
+}
+.hero-eyebrow::before{content:'';width:28px;height:1px;background:var(--dorado)}
+.hero h1{
+  font-family:var(--serif);font-weight:400;
+  font-size:clamp(42px,6vw,76px);line-height:1.04;
+  color:var(--blanco);margin-bottom:28px;letter-spacing:-0.5px;
+}
+.hero h1 em{font-style:italic;color:var(--dorado-claro);font-weight:300}
+.hero p{
+  font-size:17px;color:rgba(250,250,248,0.65);
+  max-width:440px;margin-bottom:40px;line-height:1.7;
+}
+.hero-ctas{display:flex;gap:16px;flex-wrap:wrap}
+.btn{
+  display:inline-flex;align-items:center;gap:10px;
+  padding:16px 32px;font-size:13px;letter-spacing:1.5px;
+  text-transform:uppercase;font-weight:600;border:none;
+  transition:all .3s;border-radius:2px;
+}
+.btn-gold{background:var(--dorado);color:var(--negro)}
+.btn-gold:hover{background:var(--dorado-claro);transform:translateY(-2px)}
+.btn-outline{
+  border:1px solid rgba(250,250,248,0.3);color:var(--blanco);background:transparent;
+}
+.btn-outline:hover{border-color:var(--dorado);color:var(--dorado-claro)}
+
+.hero-visual{position:relative;display:flex;justify-content:center;align-items:center}
+.hero-jar{
+  position:relative;width:280px;height:380px;
+  background:linear-gradient(160deg, #3a1410, #1a0a08);
+  border-radius:18px 18px 30px 30px;
+  box-shadow:
+    0 40px 80px rgba(0,0,0,0.5),
+    inset 0 2px 0 rgba(255,255,255,0.08),
+    0 0 0 1px rgba(201,162,39,0.15);
+  display:flex;align-items:center;justify-content:center;
+  animation:floatJar 6s ease-in-out infinite;
+}
+@keyframes floatJar{0%,100%{transform:translateY(0) rotate(-1deg)}50%{transform:translateY(-14px) rotate(1deg)}}
+.hero-jar::before{
+  content:'';position:absolute;top:-22px;left:50%;transform:translateX(-50%);
+  width:140px;height:34px;background:#0d0d0d;border-radius:6px 6px 0 0;
+  box-shadow:0 0 0 1px rgba(201,162,39,0.2);
+}
+.hero-jar-label{
+  width:200px;height:200px;border-radius:50%;
+  background:radial-gradient(circle, var(--crema), #e8e0cd);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  box-shadow:0 0 0 6px rgba(201,162,39,0.25), 0 8px 30px rgba(0,0,0,0.4);
+}
+.hero-jar-label .seal-text{font-family:var(--serif);font-size:13px;color:var(--carbon);letter-spacing:1px;text-align:center}
+.hero-jar-label .seal-sub{font-size:9px;letter-spacing:2px;color:var(--rojo);margin-top:6px;text-transform:uppercase}
+.hero-glow{
+  position:absolute;width:380px;height:380px;border-radius:50%;
+  background:radial-gradient(circle, rgba(201,162,39,0.12), transparent 70%);
+  z-index:0;
+}
+.scroll-cue{
+  position:absolute;bottom:36px;left:50%;transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:10px;
+  color:rgba(250,250,248,0.4);font-size:11px;letter-spacing:2px;text-transform:uppercase;
+}
+.scroll-line{width:1px;height:36px;background:linear-gradient(var(--dorado),transparent);animation:scrollPulse 2s ease-in-out infinite}
+@keyframes scrollPulse{0%,100%{opacity:0.3}50%{opacity:1}}
+
+/* ───── SECTION HEADERS ───── */
+.section{padding:110px 32px;max-width:1320px;margin:0 auto}
+.section-head{text-align:center;margin-bottom:64px}
+.section-eyebrow{
+  color:var(--rojo);font-size:12px;letter-spacing:3px;text-transform:uppercase;
+  font-weight:600;margin-bottom:18px;
+}
+.section-head h2{
+  font-family:var(--serif);font-size:clamp(32px,4vw,48px);font-weight:400;
+  color:var(--carbon);letter-spacing:-0.3px;
+}
+.section-head p{color:var(--gris);max-width:520px;margin:18px auto 0;font-size:16px;line-height:1.7}
+
+/* ───── FILTROS ───── */
+.filtros{
+  display:flex;justify-content:center;gap:10px;margin-bottom:56px;flex-wrap:wrap;
+}
+.filtro-btn{
+  padding:11px 24px;border:1px solid var(--gris-claro);background:transparent;
+  font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--gris);
+  border-radius:30px;transition:all .25s;font-weight:500;
+}
+.filtro-btn.active{background:var(--negro);border-color:var(--negro);color:var(--blanco)}
+.filtro-btn:hover:not(.active){border-color:var(--carbon);color:var(--carbon)}
+
+/* ───── CATALOGO GRID ───── */
+.catalogo-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:36px;
+}
+.producto-card{
+  cursor:pointer;position:relative;
+}
+.card-img-wrap{
+  position:relative;aspect-ratio:4/5;border-radius:4px;overflow:hidden;
+  background:linear-gradient(135deg,#f0ebe0,#e4ddc9);
+  margin-bottom:22px;
+}
+.card-img-wrap img{width:100%;height:100%;object-fit:cover;transition:transform .6s cubic-bezier(.2,.8,.2,1)}
+.producto-card:hover .card-img-wrap img{transform:scale(1.06)}
+.card-img-placeholder{
+  width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:10px;color:rgba(0,0,0,0.25);
+}
+.card-img-placeholder .ph-jar{width:60px;height:84px;border-radius:8px 8px 14px 14px;background:rgba(0,0,0,0.08)}
+.card-badge{
+  position:absolute;top:14px;left:14px;
+  background:rgba(10,10,10,0.85);color:var(--dorado-claro);
+  font-size:10px;letter-spacing:1.5px;text-transform:uppercase;
+  padding:6px 12px;border-radius:20px;font-weight:600;
+}
+.card-badge.agotado{background:rgba(139,26,26,0.92);color:var(--blanco)}
+.card-quickview{
+  position:absolute;bottom:14px;right:14px;
+  width:42px;height:42px;border-radius:50%;background:var(--blanco);
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;transform:translateY(8px);transition:all .3s;
+  box-shadow:0 6px 20px rgba(0,0,0,0.2);
+}
+.producto-card:hover .card-quickview{opacity:1;transform:translateY(0)}
+.card-receta{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--rojo);font-weight:600;margin-bottom:6px}
+.card-nombre{font-family:var(--serif);font-size:21px;color:var(--carbon);margin-bottom:6px;font-weight:500}
+.card-ml{font-size:13px;color:var(--gris);margin-bottom:12px}
+.card-price-row{display:flex;align-items:center;justify-content:space-between}
+.card-price{font-family:var(--serif);font-size:20px;color:var(--carbon);font-weight:500}
+.card-stock{font-size:11px;color:var(--gris)}
+.card-stock.low{color:var(--rojo)}
+
+/* ───── QUIENES SOMOS ───── */
+.quienes-somos{
+  background:var(--negro);color:var(--blanco);padding:130px 32px;position:relative;overflow:hidden;
+}
+.qs-inner{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:0.85fr 1.15fr;gap:70px;align-items:center}
+.qs-visual{
+  aspect-ratio:3/4;background:linear-gradient(150deg,#241510,#0d0805);
+  border-radius:6px;position:relative;overflow:hidden;
+  box-shadow:0 30px 70px rgba(0,0,0,0.5);
+}
+.qs-visual::after{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(circle at 30% 20%, rgba(201,162,39,0.15), transparent 60%);
+}
+.qs-eyebrow{color:var(--dorado);font-size:12px;letter-spacing:3px;text-transform:uppercase;font-weight:600;margin-bottom:20px}
+.qs-title{font-family:var(--serif);font-size:clamp(28px,3.6vw,40px);font-weight:400;margin-bottom:28px;line-height:1.25;letter-spacing:-0.3px}
+.qs-text{color:rgba(250,250,248,0.68);font-size:15.5px;line-height:1.8;margin-bottom:18px}
+.qs-divider{width:44px;height:1px;background:var(--dorado);margin:32px 0}
+
+/* ───── FOOTER ───── */
+.site-footer{background:var(--carbon);color:rgba(250,250,248,0.6);padding:64px 32px 32px}
+.footer-inner{max-width:1320px;margin:0 auto;display:flex;justify-content:space-between;flex-wrap:wrap;gap:40px;padding-bottom:40px;border-bottom:1px solid rgba(255,255,255,0.08)}
+.footer-brand{font-family:var(--serif);font-size:20px;color:var(--blanco)}
+.footer-brand span{color:var(--dorado)}
+.footer-cols{display:flex;gap:64px;flex-wrap:wrap}
+.footer-col h4{font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--blanco);margin-bottom:16px}
+.footer-col a{display:block;font-size:14px;color:rgba(250,250,248,0.55);margin-bottom:10px;transition:color .2s}
+.footer-col a:hover{color:var(--dorado-claro)}
+.footer-bottom{max-width:1320px;margin:0 auto;padding-top:24px;font-size:12px;color:rgba(250,250,248,0.35);display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+
+/* ───── MODAL PRODUCTO ───── */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(10,10,10,0.7);backdrop-filter:blur(6px);
+  z-index:2000;display:flex;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .3s;padding:24px;
+}
+.modal-overlay.open{opacity:1;pointer-events:all}
+.modal-producto{
+  background:var(--blanco);max-width:1000px;width:100%;max-height:90vh;overflow-y:auto;
+  border-radius:6px;display:grid;grid-template-columns:1fr 1fr;
+  transform:translateY(20px) scale(0.98);transition:transform .35s;
+}
+.modal-overlay.open .modal-producto{transform:translateY(0) scale(1)}
+.modal-close{
+  position:absolute;top:20px;right:20px;width:38px;height:38px;border-radius:50%;
+  background:rgba(255,255,255,0.95);display:flex;align-items:center;justify-content:center;
+  font-size:18px;border:none;z-index:10;box-shadow:0 2px 10px rgba(0,0,0,0.15);
+}
+.modal-gallery{position:relative;background:var(--crema)}
+.modal-gallery-main{aspect-ratio:4/5;overflow:hidden;position:relative}
+.modal-gallery-main img{width:100%;height:100%;object-fit:cover}
+.modal-gallery-main .card-img-placeholder{height:100%}
+.modal-gallery-thumbs{display:flex;gap:8px;padding:14px;overflow-x:auto}
+.modal-thumb{
+  width:56px;height:56px;border-radius:4px;overflow:hidden;flex-shrink:0;cursor:pointer;
+  border:2px solid transparent;opacity:0.6;transition:all .2s;background:#e4ddc9;
+}
+.modal-thumb.active{border-color:var(--dorado);opacity:1}
+.modal-thumb img{width:100%;height:100%;object-fit:cover}
+.modal-info{padding:48px 44px;display:flex;flex-direction:column}
+.modal-receta{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--rojo);font-weight:600;margin-bottom:10px}
+.modal-nombre{font-family:var(--serif);font-size:32px;color:var(--carbon);margin-bottom:8px;font-weight:500}
+.modal-tagline{font-size:14px;color:var(--gris);font-style:italic;margin-bottom:24px}
+.modal-precio{font-family:var(--serif);font-size:28px;color:var(--carbon);margin-bottom:24px;font-weight:500}
+.modal-descripcion{font-size:14.5px;color:var(--gris);line-height:1.8;margin-bottom:28px}
+.modal-stock-info{
+  display:flex;align-items:center;gap:8px;font-size:13px;color:var(--gris);margin-bottom:28px;
+  padding:12px 16px;background:var(--crema);border-radius:4px;
+}
+.modal-stock-info.low{color:var(--rojo);background:#fdf0f0}
+.modal-qty-row{display:flex;align-items:center;gap:16px;margin-bottom:24px}
+.modal-qty-row label{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--gris);font-weight:600}
+.qty-control{display:flex;align-items:center;border:1px solid var(--gris-claro);border-radius:30px}
+.qty-control button{width:38px;height:38px;background:none;border:none;font-size:16px;color:var(--carbon)}
+.qty-control span{width:36px;text-align:center;font-size:14px}
+.modal-actions{display:flex;gap:12px;margin-top:auto}
+.btn-add-cart{
+  flex:1;background:var(--negro);color:var(--blanco);padding:18px;font-size:13px;
+  letter-spacing:1.5px;text-transform:uppercase;font-weight:600;border:none;border-radius:2px;
+  transition:all .25s;
+}
+.btn-add-cart:hover{background:var(--carbon)}
+.btn-add-cart:disabled{background:var(--gris-claro);color:var(--gris);cursor:not-allowed}
+
+/* ───── CARRITO DRAWER ───── */
+.cart-overlay{
+  position:fixed;inset:0;background:rgba(10,10,10,0.5);z-index:2100;
+  opacity:0;pointer-events:none;transition:opacity .3s;
+}
+.cart-overlay.open{opacity:1;pointer-events:all}
+.cart-drawer{
+  position:fixed;top:0;right:0;width:min(440px,100vw);height:100vh;background:var(--blanco);
+  z-index:2101;transform:translateX(100%);transition:transform .4s cubic-bezier(.2,.8,.2,1);
+  display:flex;flex-direction:column;
+}
+.cart-overlay.open .cart-drawer{transform:translateX(0)}
+.cart-header{
+  padding:28px 32px;border-bottom:1px solid var(--gris-claro);
+  display:flex;justify-content:space-between;align-items:center;
+}
+.cart-header h3{font-family:var(--serif);font-size:22px;font-weight:500}
+.cart-close{background:none;border:none;font-size:22px;color:var(--gris)}
+.cart-items{flex:1;overflow-y:auto;padding:24px 32px}
+.cart-empty-state{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:100%;color:var(--gris);text-align:center;gap:14px;
+}
+.cart-empty-state .seal-icon{
+  width:60px;height:60px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, var(--dorado-claro), var(--dorado));
+  opacity:0.3;
+}
+.cart-item{
+  display:flex;gap:16px;padding:18px 0;border-bottom:1px solid #f0ede5;
+}
+.cart-item-img{
+  width:72px;height:88px;border-radius:4px;background:var(--crema);flex-shrink:0;overflow:hidden;
+}
+.cart-item-img img{width:100%;height:100%;object-fit:cover}
+.cart-item-body{flex:1;display:flex;flex-direction:column}
+.cart-item-name{font-size:14px;font-weight:500;color:var(--carbon);margin-bottom:4px}
+.cart-item-meta{font-size:12px;color:var(--gris);margin-bottom:10px}
+.cart-item-bottom{display:flex;justify-content:space-between;align-items:center;margin-top:auto}
+.cart-item-price{font-weight:600;font-size:14px}
+.cart-item-remove{font-size:12px;color:var(--rojo);background:none;border:none;text-decoration:underline}
+.cart-footer{padding:28px 32px;border-top:1px solid var(--gris-claro)}
+.cart-subtotal-row{display:flex;justify-content:space-between;font-size:15px;margin-bottom:6px;color:var(--gris)}
+.cart-total-row{display:flex;justify-content:space-between;font-family:var(--serif);font-size:22px;margin:14px 0 22px;font-weight:500}
+#paypal-button-container{min-height:55px}
+.checkout-note{font-size:11px;color:var(--gris);text-align:center;margin-top:14px;line-height:1.6}
+
+/* ───── TOAST ───── */
+.toast-tienda{
+  position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--negro);color:var(--blanco);padding:16px 28px;border-radius:4px;
+  font-size:14px;z-index:3000;opacity:0;transition:all .3s;display:flex;align-items:center;gap:10px;
+  box-shadow:0 10px 40px rgba(0,0,0,0.3);border:1px solid rgba(201,162,39,0.3);
+}
+.toast-tienda.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ───── MOBILE ───── */
+@media(max-width:900px){
+  .nav-links{display:none}
+  .burger{display:block}
+  .hero-inner{grid-template-columns:1fr;text-align:center;gap:40px}
+  .hero-eyebrow{justify-content:center}
+  .hero p{margin:0 auto 40px}
+  .hero-ctas{justify-content:center}
+  .catalogo-grid{grid-template-columns:repeat(2,1fr);gap:20px}
+  .qs-inner{grid-template-columns:1fr;gap:40px}
+  .qs-visual{max-width:280px;margin:0 auto}
+  .modal-producto{grid-template-columns:1fr}
+  .section{padding:70px 20px}
+  .header-inner{padding:16px 20px}
+}
+@media(max-width:560px){
+  .catalogo-grid{grid-template-columns:1fr 1fr;gap:14px}
+  .card-nombre{font-size:17px}
+  .filtros{gap:6px}
+  .filtro-btn{padding:8px 16px;font-size:11px}
+  .modal-info{padding:32px 24px}
+  .cart-drawer{width:100vw}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="site-header">
+  <div class="header-inner">
+    <a href="#inicio" class="logo-mark">
+      <span class="logo-seal">DM</span>
+      Doña Metiche
+    </a>
+    <nav class="nav-links">
+      <a href="#coleccion" class="nav-link">Colección</a>
+      <a href="#historia" class="nav-link">Quiénes somos</a>
+      <a href="#contacto" class="nav-link">Contacto</a>
+    </nav>
+    <button class="nav-cart" onclick="abrirCarrito()">
+      <span>Carrito</span>
+      <span class="cart-count" id="cart-count">0</span>
+    </button>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero" id="inicio">
+  <div class="hero-inner">
+    <div>
+      <div class="hero-eyebrow">Lote artesanal · Hecho a mano</div>
+      <h1>El picor que se<br><em>sirve como joya.</em></h1>
+      <p>Tres recetas, un mismo cuidado obsesivo: chiles seleccionados a mano, tueste lento y el sello de quien la hace, no de quien la fabrica en serie.</p>
+      <div class="hero-ctas">
+        <a href="#coleccion" class="btn btn-gold">Ver colección</a>
+        <a href="#historia" class="btn btn-outline">Nuestra historia</a>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="hero-glow"></div>
+      <div class="hero-jar">
+        <div class="hero-jar-label">
+          <div class="seal-text">DOÑA<br>METICHE</div>
+          <div class="seal-sub">Artesanal</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="scroll-cue"><span>Descubre</span><div class="scroll-line"></div></div>
+</section>
+
+<!-- COLECCION -->
+<section class="section" id="coleccion">
+  <div class="section-head">
+    <div class="section-eyebrow">La colección</div>
+    <h2>Tres recetas, ningún atajo</h2>
+    <p>Cada receta tiene su propio carácter. Elige por picor, por tamaño, o llévate las tres.</p>
+  </div>
+
+  <div class="filtros" id="filtros-receta"></div>
+  <div class="catalogo-grid" id="catalogo-grid"></div>
+</section>
+
+<!-- QUIENES SOMOS -->
+<section class="quienes-somos" id="historia">
+  <div class="qs-inner">
+    <div class="qs-visual"></div>
+    <div>
+      <div class="qs-eyebrow">Nuestra historia</div>
+      <h2 class="qs-title" id="qs-titulo">Salsa hecha como en casa, vendida como joyería</h2>
+      <div class="qs-divider"></div>
+      <p class="qs-text" id="qs-p1"></p>
+      <p class="qs-text" id="qs-p2"></p>
+      <p class="qs-text" id="qs-p3"></p>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="site-footer" id="contacto">
+  <div class="footer-inner">
+    <div>
+      <div class="footer-brand">Doña <span>Metiche</span></div>
+      <p style="margin-top:12px;font-size:13px;max-width:240px;color:rgba(250,250,248,0.4)">Salsas artesanales hechas en lotes pequeños, con el mismo cuidado de siempre.</p>
+    </div>
+    <div class="footer-cols">
+      <div class="footer-col">
+        <h4>Tienda</h4>
+        <a href="#coleccion">Colección completa</a>
+        <a href="#historia">Quiénes somos</a>
+      </div>
+      <div class="footer-col">
+        <h4>Contacto</h4>
+        <a href="#">WhatsApp</a>
+        <a href="#">Instagram</a>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2026 Doña Metiche. Hecho a mano, vendido en línea.</span>
+    <span>Pago seguro con PayPal</span>
+  </div>
+</footer>
+
+<!-- MODAL PRODUCTO -->
+<div class="modal-overlay" id="modal-producto-overlay">
+  <div class="modal-producto" id="modal-producto-content">
+    <button class="modal-close" onclick="cerrarModalProducto()">✕</button>
+    <!-- contenido inyectado por JS -->
+  </div>
+</div>
+
+<!-- CARRITO DRAWER -->
+<div class="cart-overlay" id="cart-overlay" onclick="cerrarCarritoOverlay(event)">
+  <div class="cart-drawer">
+    <div class="cart-header">
+      <h3>Tu carrito</h3>
+      <button class="cart-close" onclick="cerrarCarrito()">✕</button>
+    </div>
+    <div class="cart-items" id="cart-items-list"></div>
+    <div class="cart-footer" id="cart-footer"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast-tienda" id="toast-tienda"></div>
+
+<script src="https://www.paypal.com/sdk/js?client-id=BAAjdMjcpBJGmWdqQHQfUAyww44fSx2q7A91l9oUoys8lc4xJyYN3HBl3yuWWcV6_m2uf3OD3xd4Z6e-s4&currency=MXN&components=buttons"></script>
+<script src="app.js"></script>
+</body>
+</html>
