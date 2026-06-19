@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Doña Metiche</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, set, onValue, push, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyB2kHzrWrHVjflYnarEvL9UmX4nMFcfBGI",
+    authDomain: "salsa-dona-metiche.firebaseapp.com",
+    databaseURL: "https://salsa-dona-metiche-default-rtdb.firebaseio.com",
+    projectId: "salsa-dona-metiche",
+    storageBucket: "salsa-dona-metiche.firebasestorage.app",
+    messagingSenderId: "598569874314",
+    appId: "1:598569874314:web:41216b2f24f9181acf8e73"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  window._db = db;
+  window._dbRefs = { ref, set, onValue, push, remove };
+
+  const PRODUCTOS_BASE = [
+    {id:'MOR-235',nombre:'Morita 235 ml',receta:'Morita',ml:235,precio:100},
+    {id:'MOR-120',nombre:'Morita 120 ml',receta:'Morita',ml:120,precio:60},
+    {id:'MOR-29', nombre:'Morita 29 ml', receta:'Morita',ml:29, precio:25},
+    {id:'HAB-235',nombre:'Habanero 235 ml',receta:'Habanero',ml:235,precio:100},
+    {id:'HAB-120',nombre:'Habanero 120 ml',receta:'Habanero',ml:120,precio:60},
+    {id:'HAB-29', nombre:'Habanero 29 ml', receta:'Habanero',ml:29, precio:25},
+    {id:'ARL-235',nombre:'Chile de árbol 235 ml',receta:'Chile de árbol',ml:235,precio:100},
+    {id:'ARL-120',nombre:'Chile de árbol 120 ml',receta:'Chile de árbol',ml:120,precio:60},
+    {id:'ARL-29', nombre:'Chile de árbol 29 ml', receta:'Chile de árbol',ml:29, precio:25},
+  ];
+  window._PRODUCTOS_BASE = PRODUCTOS_BASE;
+
+  document.addEventListener('DOMContentLoaded', () => {
+    if (window.adminInit) window.adminInit();
+  });
+</script>
+
+<style>
+:root{
+  --negro:#0A0A0A;--carbon:#1C1C1A;--blanco:#FAFAF8;--crema:#F3EFE7;
+  --dorado:#C9A227;--rojo:#8B1A1A;--verde:#27500A;--gris:#6B6862;--gris-claro:#D8D4CC;
+  --serif:'Fraunces',serif;--sans:'Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--sans);background:var(--crema);color:var(--carbon);min-height:100vh}
+.admin-header{background:var(--negro);color:var(--blanco);padding:20px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.admin-header h1{font-family:var(--serif);font-size:20px;font-weight:500}
+.admin-header h1 span{color:var(--dorado)}
+.admin-header a{color:rgba(250,250,248,0.6);font-size:13px;text-decoration:underline}
+.admin-nav{display:flex;gap:4px;background:#fff;padding:0 28px;overflow-x:auto;border-bottom:1px solid var(--gris-claro);position:sticky;top:64px;z-index:49}
+.admin-tab{padding:14px 16px;font-size:13px;font-weight:500;border:none;background:none;color:var(--gris);border-bottom:2.5px solid transparent;white-space:nowrap;cursor:pointer}
+.admin-tab.active{color:var(--rojo);border-bottom-color:var(--rojo)}
+.admin-panel{display:none;max-width:880px;margin:0 auto;padding:40px 24px 100px}
+.admin-panel.active{display:block}
+.admin-section{background:#fff;border-radius:8px;padding:32px;margin-bottom:24px;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+.admin-section h2{font-family:var(--serif);font-size:21px;margin-bottom:6px;font-weight:500}
+.admin-section .sub{font-size:13px;color:var(--gris);margin-bottom:22px;line-height:1.6}
+
+.receta-group{margin-bottom:26px}
+.receta-group h3{font-size:12.5px;letter-spacing:1px;text-transform:uppercase;color:var(--rojo);margin-bottom:12px;font-weight:600}
+.producto-admin-row{display:flex;align-items:center;gap:14px;padding:14px;border:1px solid var(--gris-claro);border-radius:6px;margin-bottom:8px;flex-wrap:wrap}
+.pa-info{min-width:90px;font-size:13px;font-weight:600}
+.pa-precio-input{width:90px;border:1px solid var(--gris-claro);border-radius:5px;padding:8px 10px;font-size:13px;font-family:var(--sans)}
+.pa-fotos-preview{display:flex;gap:6px;flex:1;flex-wrap:wrap;min-width:160px}
+.pa-foto-thumb{width:46px;height:46px;border-radius:4px;overflow:hidden;position:relative;flex-shrink:0;background:var(--crema)}
+.pa-foto-thumb img{width:100%;height:100%;object-fit:cover}
+.pa-foto-thumb .pa-remove{position:absolute;top:0;right:0;background:rgba(139,26,26,0.9);color:#fff;width:15px;height:15px;font-size:9px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.pa-upload-btn{width:46px;height:46px;border:2px dashed var(--gris-claro);border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--gris);font-size:18px;flex-shrink:0}
+.pa-upload-btn:hover{border-color:var(--dorado);color:var(--dorado)}
+.pa-upload-btn input{display:none}
+
+.qs-field{margin-bottom:16px}
+.qs-field label{display:block;font-size:12px;font-weight:600;color:var(--gris);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px}
+.qs-field input,.qs-field textarea,.qs-field select{width:100%;border:1px solid var(--gris-claro);border-radius:6px;padding:11px 14px;font-size:14px;font-family:var(--sans);outline:none;transition:border .2s}
+.qs-field input:focus,.qs-field textarea:focus{border-color:var(--dorado)}
+.qs-field textarea{resize:vertical;min-height:70px}
+.qs-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+
+.btn-guardar{background:var(--negro);color:#fff;padding:13px 28px;border:none;border-radius:4px;font-size:12.5px;letter-spacing:1px;text-transform:uppercase;font-weight:600;cursor:pointer;transition:all .2s}
+.btn-guardar:hover{background:var(--carbon)}
+
+.promo-card{border:1px solid var(--gris-claro);border-radius:8px;padding:20px;margin-bottom:16px}
+.promo-card h4{font-size:15px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+
+.cupon-row{display:flex;gap:10px;align-items:center;padding:12px;border:1px solid var(--gris-claro);border-radius:6px;margin-bottom:10px}
+.cupon-codigo{flex:1;text-transform:uppercase;font-weight:700;font-family:monospace}
+.btn-del-cupon{background:none;border:none;color:var(--rojo);font-size:13px;cursor:pointer;text-decoration:underline}
+
+.warning-box{background:#fff4e6;border:1px solid #e8c896;border-radius:6px;padding:14px 18px;font-size:12.5px;color:#7a5a1a;line-height:1.6;margin-bottom:20px}
+.toast-admin{position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--negro);color:#fff;padding:14px 26px;border-radius:4px;font-size:13px;opacity:0;transition:all .3s;z-index:999}
+.toast-admin.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<div class="admin-header">
+  <h1>Doña Metiche <span>· Admin</span></h1>
+  <a href="index.html">Ver tienda →</a>
+</div>
+
+<nav class="admin-nav">
+  <button class="admin-tab active" onclick="cambiarTab('precios',this)">💰 Precios</button>
+  <button class="admin-tab" onclick="cambiarTab('promos',this)">🏷️ Promociones</button>
+  <button class="admin-tab" onclick="cambiarTab('envios',this)">🚚 Envíos</button>
+  <button class="admin-tab" onclick="cambiarTab('cupones',this)">🎟️ Cupones</button>
+  <button class="admin-tab" onclick="cambiarTab('fotos',this)">📷 Fotos</button>
+  <button class="admin-tab" onclick="cambiarTab('historia',this)">📖 Quiénes somos</button>
+</nav>
+
+<div id="panel-precios" class="admin-panel active">
+  <div class="admin-section">
+    <h2>Precios por producto</h2>
+    <p class="sub">Edita el precio individual de cada receta y tamaño. Se aplica de inmediato en la tienda.</p>
+    <div id="precios-container"></div>
+    <button class="btn-guardar" onclick="guardarPrecios()">Guardar precios</button>
+  </div>
+</div>
+
+<div id="panel-promos" class="admin-panel">
+  <div class="admin-section">
+    <h2>Promociones por mayoreo</h2>
+    <p class="sub">Define con cuántas piezas se activa cada promoción y a qué precio total se vende el paquete.</p>
+
+    <div class="promo-card">
+      <h4>🏷️ Promo 235 ml</h4>
+      <div class="qs-row">
+        <div class="qs-field"><label>Piezas necesarias</label><input type="number" id="promo235-cant" min="2" value="3"/></div>
+        <div class="qs-field"><label>Precio total del paquete (MXN)</label><input type="number" id="promo235-precio" min="0" value="250"/></div>
+      </div>
+    </div>
+
+    <div class="promo-card">
+      <h4>🏷️ Promo 120 ml</h4>
+      <div class="qs-row">
+        <div class="qs-field"><label>Piezas necesarias</label><input type="number" id="promo120-cant" min="2" value="3"/></div>
+        <div class="qs-field"><label>Precio total del paquete (MXN)</label><input type="number" id="promo120-precio" min="0" value="150"/></div>
+      </div>
+    </div>
+
+    <div class="promo-card">
+      <h4>🏷️ Promo 29 ml</h4>
+      <div class="qs-row">
+        <div class="qs-field"><label>Piezas necesarias</label><input type="number" id="promo29-cant" min="2" value="3"/></div>
+        <div class="qs-field"><label>Precio total del paquete (MXN)</label><input type="number" id="promo29-precio" min="0" value="60"/></div>
+      </div>
+    </div>
+
+    <button class="btn-guardar" onclick="guardarPromos()">Guardar promociones</button>
+  </div>
+</div>
+
+<div id="panel-envios" class="admin-panel">
+  <div class="admin-section">
+    <h2>Costos de envío</h2>
+    <p class="sub">Define el costo fijo de envío y a partir de qué monto de compra el envío es gratis.</p>
+    <div class="qs-row">
+      <div class="qs-field"><label>Costo de envío (MXN)</label><input type="number" id="envio-costo" min="0" value="80"/></div>
+      <div class="qs-field"><label>Compra mínima para envío gratis (MXN)</label><input type="number" id="envio-minimo-gratis" min="0" value="600"/></div>
+    </div>
+    <p style="font-size:12px;color:var(--gris);margin-bottom:18px">Pon 0 en "compra mínima" si no quieres ofrecer envío gratis nunca.</p>
+    <button class="btn-guardar" onclick="guardarEnvios()">Guardar envíos</button>
+  </div>
+</div>
+
+<div id="panel-cupones" class="admin-panel">
+  <div class="admin-section">
+    <h2>Cupones de descuento</h2>
+    <p class="sub">Crea códigos que tus clientes pueden ingresar en el carrito para obtener un % de descuento.</p>
+    <div id="cupones-container"></div>
+    <div style="display:flex;gap:10px;margin-top:16px;margin-bottom:10px">
+      <input type="text" id="nuevo-cupon-codigo" placeholder="CÓDIGO" style="flex:1;border:1px solid var(--gris-claro);border-radius:5px;padding:10px;text-transform:uppercase;font-family:monospace;font-weight:700"/>
+      <input type="number" id="nuevo-cupon-pct" placeholder="% desc." min="1" max="100" style="width:100px;border:1px solid var(--gris-claro);border-radius:5px;padding:10px"/>
+      <button class="btn-guardar" onclick="agregarCupon()" style="white-space:nowrap">+ Agregar</button>
+    </div>
+  </div>
+</div>
+
+<div id="panel-fotos" class="admin-panel">
+  <div class="warning-box">
+    📷 Las fotos se guardan como texto (base64) directo en la base de datos y se comprimen automáticamente al subirlas. Usa fotos de buena luz, fondo limpio.
+  </div>
+  <div class="admin-section">
+    <h2>Fotos de productos</h2>
+    <p class="sub">Sube hasta 5 fotos por producto. La primera es la foto principal del catálogo.</p>
+    <div id="fotos-container"></div>
+  </div>
+</div>
+
+<div id="panel-historia" class="admin-panel">
+  <div class="admin-section">
+    <h2>Quiénes somos</h2>
+    <p class="sub">Este texto aparece en la sección "Quiénes somos" de la tienda.</p>
+    <div class="qs-field"><label>Título principal</label><input type="text" id="qs-titulo-input"/></div>
+    <div class="qs-field"><label>Párrafo 1</label><textarea id="qs-p1-input"></textarea></div>
+    <div class="qs-field"><label>Párrafo 2</label><textarea id="qs-p2-input"></textarea></div>
+    <div class="qs-field"><label>Párrafo 3</label><textarea id="qs-p3-input"></textarea></div>
+    <button class="btn-guardar" onclick="guardarQuienesSomos()">Guardar cambios</button>
+  </div>
+</div>
+
+<div class="toast-admin" id="toast-admin"></div>
+
+<script>
+let fotosActuales = {};
+let preciosActuales = {};
+let cuponesActuales = {};
+
+function cambiarTab(t, btn) {
+  document.querySelectorAll('.admin-tab').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.admin-panel').forEach(x => x.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('panel-' + t).classList.add('active');
+}
+window.cambiarTab = cambiarTab;
+
+function toastAdmin(msg) {
+  const el = document.getElementById('toast-admin');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+function adminInit() {
+  cargarPrecios();
+  cargarPromos();
+  cargarEnvios();
+  cargarCupones();
+  cargarFotos();
+  cargarQuienesSomos();
+}
+window.adminInit = adminInit;
+
+function cargarPrecios() {
+  const { ref, onValue } = window._dbRefs;
+  onValue(ref(window._db, 'tienda/precios'), snap => {
+    const data = snap.val() || {};
+    window._PRODUCTOS_BASE.forEach(p => { preciosActuales[p.id] = data[p.id] !== undefined ? data[p.id] : p.precio; });
+    renderPrecios();
+  });
+}
+
+function renderPrecios() {
+  const recetas = ['Morita', 'Habanero', 'Chile de árbol'];
+  const container = document.getElementById('precios-container');
+  container.innerHTML = recetas.map(r => {
+    const prods = window._PRODUCTOS_BASE.filter(p => p.receta === r);
+    return `
+      <div class="receta-group">
+        <h3>${r}</h3>
+        ${prods.map(p => `
+          <div class="producto-admin-row">
+            <div class="pa-info">${p.ml} ml</div>
+            <label style="font-size:12px;color:var(--gris)">$</label>
+            <input type="number" class="pa-precio-input" id="precio-${p.id}" value="${preciosActuales[p.id]}" min="0"/>
+            <span style="font-size:11px;color:var(--gris)">MXN</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }).join('');
+}
+
+async function guardarPrecios() {
+  const { ref, set } = window._dbRefs;
+  const nuevos = {};
+  window._PRODUCTOS_BASE.forEach(p => {
+    nuevos[p.id] = parseFloat(document.getElementById('precio-' + p.id).value) || 0;
+  });
+  await set(ref(window._db, 'tienda/precios'), nuevos);
+  toastAdmin('Precios guardados ✓');
+}
+window.guardarPrecios = guardarPrecios;
+
+function cargarPromos() {
+  const { ref, onValue } = window._dbRefs;
+  onValue(ref(window._db, 'tienda/promos'), snap => {
+    const data = snap.val();
+    if (data) {
+      if (data.p235) { document.getElementById('promo235-cant').value = data.p235.cantidad; document.getElementById('promo235-precio').value = data.p235.precio; }
+      if (data.p120) { document.getElementById('promo120-cant').value = data.p120.cantidad; document.getElementById('promo120-precio').value = data.p120.precio; }
+      if (data.p29)  { document.getElementById('promo29-cant').value = data.p29.cantidad; document.getElementById('promo29-precio').value = data.p29.precio; }
+    }
+  });
+}
+
+async function guardarPromos() {
+  const { ref, set } = window._dbRefs;
+  const data = {
+    p235: { cantidad: parseInt(document.getElementById('promo235-cant').value) || 3, precio: parseFloat(document.getElementById('promo235-precio').value) || 0 },
+    p120: { cantidad: parseInt(document.getElementById('promo120-cant').value) || 3, precio: parseFloat(document.getElementById('promo120-precio').value) || 0 },
+    p29:  { cantidad: parseInt(document.getElementById('promo29-cant').value) || 3, precio: parseFloat(document.getElementById('promo29-precio').value) || 0 }
+  };
+  await set(ref(window._db, 'tienda/promos'), data);
+  toastAdmin('Promociones guardadas ✓');
+}
+window.guardarPromos = guardarPromos;
+
+function cargarEnvios() {
+  const { ref, onValue } = window._dbRefs;
+  onValue(ref(window._db, 'tienda/envios'), snap => {
+    const data = snap.val();
+    if (data) {
+      document.getElementById('envio-costo').value = data.costo;
+      document.getElementById('envio-minimo-gratis').value = data.minimoGratis;
+    }
+  });
+}
+
+async function guardarEnvios() {
+  const { ref, set } = window._dbRefs;
+  const data = {
+    costo: parseFloat(document.getElementById('envio-costo').value) || 0,
+    minimoGratis: parseFloat(document.getElementById('envio-minimo-gratis').value) || 0
+  };
+  await set(ref(window._db, 'tienda/envios'), data);
+  toastAdmin('Envíos guardados ✓');
+}
+window.guardarEnvios = guardarEnvios;
+
+function cargarCupones() {
+  const { ref, onValue } = window._dbRefs;
+  onValue(ref(window._db, 'tienda/cupones'), snap => {
+    cuponesActuales = snap.val() || {};
+    renderCupones();
+  });
+}
+
+function renderCupones() {
+  const container = document.getElementById('cupones-container');
+  const keys = Object.keys(cuponesActuales);
+  if (!keys.length) { container.innerHTML = '<p style="font-size:13px;color:var(--gris);margin-bottom:10px">No hay cupones creados todavía.</p>'; return; }
+  container.innerHTML = keys.map(codigo => `
+    <div class="cupon-row">
+      <span class="cupon-codigo">${codigo}</span>
+      <span style="font-size:13px;font-weight:600">${cuponesActuales[codigo]}% de descuento</span>
+      <button class="btn-del-cupon" onclick="eliminarCupon('${codigo}')">Eliminar</button>
+    </div>
+  `).join('');
+}
+
+async function agregarCupon() {
+  const codigo = document.getElementById('nuevo-cupon-codigo').value.trim().toUpperCase();
+  const pct = parseFloat(document.getElementById('nuevo-cupon-pct').value);
+  if (!codigo || !pct || pct <= 0 || pct > 100) { toastAdmin('Ingresa un código y un % válido (1-100)'); return; }
+  const { ref, set } = window._dbRefs;
+  await set(ref(window._db, 'tienda/cupones/' + codigo), pct);
+  document.getElementById('nuevo-cupon-codigo').value = '';
+  document.getElementById('nuevo-cupon-pct').value = '';
+  toastAdmin('Cupón ' + codigo + ' creado ✓');
+}
+window.agregarCupon = agregarCupon;
+
+async function eliminarCupon(codigo) {
+  const { ref, remove } = window._dbRefs;
+  await remove(ref(window._db, 'tienda/cupones/' + codigo));
+  toastAdmin('Cupón eliminado');
+}
+window.eliminarCupon = eliminarCupon;
+
+function cargarFotos() {
+  const { ref, onValue } = window._dbRefs;
+  onValue(ref(window._db, 'tienda/fotos'), snap => {
+    fotosActuales = snap.val() || {};
+    renderFotosAdmin();
+  });
+}
+
+function renderFotosAdmin() {
+  const recetas = ['Morita', 'Habanero', 'Chile de árbol'];
+  const container = document.getElementById('fotos-container');
+  container.innerHTML = recetas.map(r => {
+    const prods = window._PRODUCTOS_BASE.filter(p => p.receta === r);
+    return `
+      <div class="receta-group">
+        <h3>${r}</h3>
+        ${prods.map(p => {
+          const fotos = fotosActuales[p.id] || [];
+          return `
+            <div class="producto-admin-row">
+              <div class="pa-info">${p.ml} ml</div>
+              <div class="pa-fotos-preview" id="fotos-preview-${p.id}">
+                ${fotos.map((f, i) => `
+                  <div class="pa-foto-thumb"><img src="${f}"/><div class="pa-remove" onclick="quitarFoto('${p.id}', ${i})">✕</div></div>
+                `).join('')}
+                ${fotos.length < 5 ? `
+                  <label class="pa-upload-btn">+<input type="file" accept="image/*" multiple onchange="subirFotos('${p.id}', this.files)"/></label>
+                ` : ''}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }).join('');
+}
+
+function comprimirImagen(file, maxWidth = 900, calidad = 0.75) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if (w > maxWidth) { h = h * (maxWidth / w); w = maxWidth; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', calidad));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function subirFotos(productoId, files) {
+  const actuales = fotosActuales[productoId] || [];
+  const espacioDisponible = 5 - actuales.length;
+  const archivos = Array.from(files).slice(0, espacioDisponible);
+  toastAdmin('Subiendo fotos...');
+  const nuevasFotos = [];
+  for (const file of archivos) {
+    try { nuevasFotos.push(await comprimirImagen(file)); } catch (err) { console.error(err); }
+  }
+  const todas = [...actuales, ...nuevasFotos];
+  const { ref, set } = window._dbRefs;
+  await set(ref(window._db, 'tienda/fotos/' + productoId), todas);
+  toastAdmin('Fotos guardadas ✓');
+}
+window.subirFotos = subirFotos;
+
+async function quitarFoto(productoId, idx) {
+  const actuales = [...(fotosActuales[productoId] || [])];
+  actuales.splice(idx, 1);
+  const { ref, set } = window._dbRefs;
+  await set(ref(window._db, 'tienda/fotos/' + productoId), actuales);
+  toastAdmin('Foto eliminada');
+}
+window.quitarFoto = quitarFoto;
+
+function cargarQuienesSomos() {
+  const { ref, onValue } = window._dbRefs;
+  onValue(ref(window._db, 'tienda/quienesSomos'), snap => {
+    const data = snap.val();
+    if (data) {
+      document.getElementById('qs-titulo-input').value = data.titulo || '';
+      document.getElementById('qs-p1-input').value = data.parrafo1 || '';
+      document.getElementById('qs-p2-input').value = data.parrafo2 || '';
+      document.getElementById('qs-p3-input').value = data.parrafo3 || '';
+    } else {
+      document.getElementById('qs-titulo-input').value = 'Salsa hecha como en casa, vendida como joyería';
+      document.getElementById('qs-p1-input').value = 'Doña Metiche nació en una cocina familiar, entre frascos hirviendo y recetas que pasaban de mano en mano sin escribirse en ningún lado. Cada lote se sigue haciendo igual: chiles seleccionados uno por uno, tueste lento, y el mismo cuidado de siempre.';
+      document.getElementById('qs-p2-input').value = 'No hacemos salsa para llenar un anaquel. Hacemos salsa para que la primera cucharada te haga preguntar quién la hizo.';
+      document.getElementById('qs-p3-input').value = 'Hoy seguimos siendo un negocio pequeño y artesanal — eso es exactamente lo que queremos seguir siendo.';
+    }
+  });
+}
+
+async function guardarQuienesSomos() {
+  const data = {
+    titulo: document.getElementById('qs-titulo-input').value,
+    parrafo1: document.getElementById('qs-p1-input').value,
+    parrafo2: document.getElementById('qs-p2-input').value,
+    parrafo3: document.getElementById('qs-p3-input').value
+  };
+  const { ref, set } = window._dbRefs;
+  await set(ref(window._db, 'tienda/quienesSomos'), data);
+  toastAdmin('Texto guardado ✓');
+}
+window.guardarQuienesSomos = guardarQuienesSomos;
+</script>
+</body>
+</html>
