@@ -214,6 +214,18 @@ body{font-family:var(--sans);background:var(--crema);color:var(--carbon);min-hei
 
 <div id="panel-historia" class="admin-panel">
   <div class="admin-section">
+    <h2>Imagen principal (hero)</h2>
+    <p class="sub">Reemplaza el frasco animado del inicio por una foto de tu salsa.</p>
+    <div style="display:flex;align-items:center;gap:16px">
+      <div id="hero-img-preview" style="width:70px;height:95px;border-radius:8px;overflow:hidden;background:var(--crema);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--gris);text-align:center">Sin imagen</div>
+      <label class="pa-upload-btn" style="width:60px;height:60px;font-size:22px">
+        +<input type="file" accept="image/*" onchange="subirImagenHero(this.files[0])"/>
+      </label>
+      <button class="btn-del-cupon" onclick="quitarImagenHero()">Quitar (volver al frasco)</button>
+    </div>
+  </div>
+
+  <div class="admin-section">
     <h2>Imagen de "Quiénes somos"</h2>
     <p class="sub">Reemplaza el rectángulo de la sección "Nuestra historia" por una foto de tu salsa.</p>
     <div style="display:flex;align-items:center;gap:16px">
@@ -705,9 +717,38 @@ function exportarClientesCSV() {
 }
 window.exportarClientesCSV = exportarClientesCSV;
 
+// ───── IMAGEN HERO ─────
+function cargarImagenHero() {
+  const { ref, onValue } = window._dbRefs;
+  onValue(ref(window._db, 'tienda/imagenHero'), snap => {
+    const url = snap.val();
+    const el = document.getElementById('hero-img-preview');
+    if (el) el.innerHTML = url ? `<img src="${url}" style="width:100%;height:100%;object-fit:cover"/>` : 'Sin imagen';
+  });
+}
+
+async function subirImagenHero(file) {
+  if (!file) return;
+  toastAdmin('Subiendo imagen hero...');
+  try {
+    const dataUrl = await comprimirImagen(file, 900, 0.82);
+    const { ref, set } = window._dbRefs;
+    await set(ref(window._db, 'tienda/imagenHero'), dataUrl);
+    toastAdmin('Imagen hero guardada ✓');
+  } catch (err) { toastAdmin('Error subiendo imagen'); }
+}
+window.subirImagenHero = subirImagenHero;
+
+async function quitarImagenHero() {
+  const { ref, remove } = window._dbRefs;
+  await remove(ref(window._db, 'tienda/imagenHero'));
+  toastAdmin('Imagen eliminada, se usará el frasco animado');
+}
+window.quitarImagenHero = quitarImagenHero;
+
 // Agregar carga de clientes al init
 const _adminInitOrig = window.adminInit;
-window.adminInit = function() { _adminInitOrig(); cargarClientes(); };
+window.adminInit = function() { _adminInitOrig(); cargarClientes(); cargarImagenHero(); };
 </script>
 
 <div class="toast-admin" id="toast-admin"></div>
