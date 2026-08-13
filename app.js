@@ -658,17 +658,56 @@ async function enviarCorreoNuevoPedido(pedido) {
   const cfg = window._EMAILJS_CONFIG;
   if (!cfg || cfg.serviceId === 'TU_SERVICE_ID') { console.warn('EmailJS no configurado'); return; }
   const c = pedido.cliente;
-  const productos = pedido.lineas.map(l => l.nombre + ' x' + l.qty).join(', ');
+  const lineasHtml = pedido.lineas.map(l =>
+    `<tr><td style="padding:8px 0;border-bottom:1px solid #f0ede5">${l.nombre}</td><td style="padding:8px 0;border-bottom:1px solid #f0ede5;text-align:center">×${l.qty}</td><td style="padding:8px 0;border-bottom:1px solid #f0ede5;text-align:right">$${l.subtotal}</td></tr>`
+  ).join('');
+  const desglose = calcularDesglose();
+  const fecha = new Date(pedido.fecha).toLocaleDateString('es-MX', {day:'2-digit',month:'long',year:'numeric'});
+  const pedidoId = (pedido.paypalOrderId || '').slice(-8) || 'N/A';
+
+  const ticketHtml = `
+<div style="font-family:'Segoe UI',Arial,sans-serif;max-width:520px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e8e3dc">
+  <div style="background:#0A0A0A;padding:28px 32px;text-align:center">
+    <div style="color:#D4621A;font-size:11px;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px">Confirmación de pedido</div>
+    <div style="color:#FAFAF8;font-size:22px;font-weight:600">Doña Metiche</div>
+    <div style="color:rgba(250,250,248,0.6);font-size:12px;margin-top:4px">${fecha} · Pedido #${pedidoId}</div>
+  </div>
+  <div style="padding:28px 32px">
+    <p style="font-size:15px;color:#1C1C1A;margin-bottom:20px">Hola <strong>${c.nombre}</strong>, recibimos tu pedido. Aquí está tu resumen:</p>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:20px">
+      <thead><tr>
+        <th style="text-align:left;font-size:11px;color:#6B6862;text-transform:uppercase;padding-bottom:8px;border-bottom:2px solid #e8e3dc">Producto</th>
+        <th style="text-align:center;font-size:11px;color:#6B6862;text-transform:uppercase;padding-bottom:8px;border-bottom:2px solid #e8e3dc">Cant.</th>
+        <th style="text-align:right;font-size:11px;color:#6B6862;text-transform:uppercase;padding-bottom:8px;border-bottom:2px solid #e8e3dc">Precio</th>
+      </tr></thead>
+      <tbody>${lineasHtml}</tbody>
+    </table>
+    ${desglose.descuentoPromo > 0 ? `<div style="display:flex;justify-content:space-between;font-size:13px;color:#27500A;margin-bottom:6px"><span>Descuento promo</span><span>-$${desglose.descuentoPromo}</span></div>` : ''}
+    ${desglose.descuentoCupon > 0 ? `<div style="display:flex;justify-content:space-between;font-size:13px;color:#27500A;margin-bottom:6px"><span>Cupón</span><span>-$${desglose.descuentoCupon}</span></div>` : ''}
+    <div style="display:flex;justify-content:space-between;font-size:13px;color:#6B6862;margin-bottom:6px"><span>Envío</span><span>${desglose.envioGratis ? 'Gratis' : '$'+desglose.costoEnvio}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:20px;font-weight:700;color:#0A0A0A;border-top:2px solid #0A0A0A;padding-top:14px;margin-top:10px"><span>Total</span><span>$${pedido.total}</span></div>
+    <div style="background:#F3EFE7;border-radius:6px;padding:16px;margin-top:24px">
+      <div style="font-size:11px;text-transform:uppercase;color:#6B6862;margin-bottom:8px;font-weight:600">Dirección de envío</div>
+      <div style="font-size:13px;color:#1C1C1A;line-height:1.7">${c.nombre} ${c.apellidos}<br>${c.direccion}, ${c.colonia}<br>${c.ciudad}, ${c.estado}, CP ${c.cp}<br>${c.email}${c.telefono ? '<br>'+c.telefono : ''}</div>
+    </div>
+    <p style="font-size:12px;color:#6B6862;margin-top:24px;text-align:center">Recibirás una notificación cuando tu pedido sea enviado.<br>¿Dudas? Contáctanos por WhatsApp.</p>
+  </div>
+  <div style="background:#1C1C1A;padding:16px 32px;text-align:center;font-size:11px;color:rgba(250,250,248,0.4)">
+    Salsa Doña Metiche · Artesanal con amor 🌶️
+  </div>
+</div>`;
+
   try {
     await window.emailjs.send(cfg.serviceId, cfg.templateId, {
       nombre: c.nombre,
-      pedido_id: (pedido.paypalOrderId || '').slice(-8),
+      pedido_id: pedidoId,
       nuevo_estatus: '🟡 Pedido recibido',
       guia: 'Aún no disponible',
       paqueteria: 'Por confirmar',
-      productos,
+      productos: pedido.lineas.map(l => l.nombre + ' x' + l.qty).join(', '),
       total: '$' + pedido.total,
-      to_email: c.email
+      to_email: c.email,
+      ticket_html: ticketHtml
     });
   } catch (err) {
     console.error('Error enviando correo de confirmación:', err);
