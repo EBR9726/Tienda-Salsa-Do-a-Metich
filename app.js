@@ -85,7 +85,7 @@ function renderCatalogo() {
         <div class="rc-nombre">${receta}</div>
         <div class="rc-tagline">${info.tagline}</div>
         <div class="rc-price-row">
-          <span class="rc-price">$${repPrincipal.precio}<span> desde / 235ml</span></span>
+          <span class="rc-price">$${repPrincipal.precio}<span> / 235ml</span></span>
         </div>
       </div>
     `;
@@ -289,9 +289,12 @@ function calcularDesglose() {
   const despuesPromo = subtotal - descuentoPromo;
 
   let descuentoCupon = 0;
+  let cuponEnvioGratis = false;
   if (cuponAplicado) {
     const cupones = getCupones();
-    const pct = cupones[cuponAplicado];
+    const cuponData = cupones[cuponAplicado];
+    const pct = (typeof cuponData === 'object') ? (cuponData.pct || 0) : (cuponData || 0);
+    cuponEnvioGratis = (typeof cuponData === 'object') ? !!cuponData.envioGratis : false;
     if (pct) descuentoCupon = Math.round(despuesPromo * pct / 100);
   }
 
@@ -300,14 +303,17 @@ function calcularDesglose() {
   const envios = getEnvios();
   let costoEnvio = envios.costo || 0;
   let envioGratis = false;
-  if (envios.minimoGratis > 0 && despuesCupon >= envios.minimoGratis) {
+  if (cuponEnvioGratis) {
+    costoEnvio = 0;
+    envioGratis = true;
+  } else if (envios.minimoGratis > 0 && despuesCupon >= envios.minimoGratis) {
     costoEnvio = 0;
     envioGratis = true;
   }
 
   const total = despuesCupon + costoEnvio;
 
-  return { subtotal, descuentoPromo, despuesPromo, descuentoCupon, despuesCupon, costoEnvio, envioGratis, total, detalleLineas, envios };
+  return { subtotal, descuentoPromo, despuesPromo, descuentoCupon, despuesCupon, costoEnvio, envioGratis, cuponEnvioGratis, total, detalleLineas, envios };
 }
 
 // ─────────────────────────────────────────────────────────
@@ -386,7 +392,13 @@ function aplicarCupon() {
   if (!cupones[codigo]) { toastTienda('Cupón no válido'); return; }
   cuponAplicado = codigo;
   renderCarrito();
-  toastTienda(`Cupón ${codigo} aplicado: ${cupones[codigo]}% de descuento`);
+  const cuponData = cupones[codigo];
+  const pct = (typeof cuponData === 'object') ? (cuponData.pct || 0) : (cuponData || 0);
+  const envioGratis = (typeof cuponData === 'object') ? !!cuponData.envioGratis : false;
+  const partes = [];
+  if (pct > 0) partes.push(pct + '% de descuento');
+  if (envioGratis) partes.push('envío gratis');
+  toastTienda(`Cupón ${codigo} aplicado: ${partes.join(' + ')}`);
 }
 window.aplicarCupon = aplicarCupon;
 
@@ -594,6 +606,24 @@ async function finalizarCompra(infoPago) {
     };
 
     await push(ref(db, 'historial'), entry);
+
+    // Guardar/actualizar cliente en base de clientes
+    const clienteKey = datosCliente.email.replace(/[.#$[\]]/g, '_');
+    await set(ref(db, 'clientes/' + clienteKey), {
+      nombre: datosCliente.nombre,
+      apellidos: datosCliente.apellidos,
+      email: datosCliente.email,
+      telefono: datosCliente.telefono || '',
+      direccion: datosCliente.direccion,
+      colonia: datosCliente.colonia,
+      cp: datosCliente.cp,
+      ciudad: datosCliente.ciudad,
+      estado: datosCliente.estado,
+      ultimaCompra: new Date().toISOString(),
+      totalCompras: (await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js")
+        .then(m => m.get(m.ref(db, 'clientes/' + clienteKey + '/totalCompras')))
+        .then(s => (s.val() || 0) + 1).catch(() => 1))
+    });
 
     for (const c of carrito) {
       const invRef = ref(db, 'inventario/' + c.id);
