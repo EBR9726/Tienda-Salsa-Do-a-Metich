@@ -46,7 +46,7 @@
 <style>
 :root{
   --negro:#0A0A0A;--carbon:#1C1C1A;--blanco:#FAFAF8;--crema:#F3EFE7;
-  --dorado:#C9A227;--rojo:#8B1A1A;--verde:#27500A;--gris:#6B6862;--gris-claro:#D8D4CC;
+  --dorado:#D4621A;--rojo:#8B1A1A;--verde:#27500A;--gris:#6B6862;--gris-claro:#D8D4CC;
   --serif:'Fraunces',serif;--sans:'Inter',sans-serif;
 }
 *{margin:0;padding:0;box-sizing:border-box}
@@ -113,6 +113,7 @@ body{font-family:var(--sans);background:var(--crema);color:var(--carbon);min-hei
   <button class="admin-tab" onclick="cambiarTab('cupones',this)">🎟️ Cupones</button>
   <button class="admin-tab" onclick="cambiarTab('fotos',this)">📷 Fotos</button>
   <button class="admin-tab" onclick="cambiarTab('historia',this)">📖 Quiénes somos</button>
+  <button class="admin-tab" onclick="cambiarTab('clientes',this)">👥 Clientes</button>
 </nav>
 
 <div id="panel-precios" class="admin-panel active">
@@ -173,13 +174,17 @@ body{font-family:var(--sans);background:var(--crema);color:var(--carbon);min-hei
 <div id="panel-cupones" class="admin-panel">
   <div class="admin-section">
     <h2>Cupones de descuento</h2>
-    <p class="sub">Crea códigos que tus clientes pueden ingresar en el carrito para obtener un % de descuento.</p>
+    <p class="sub">Crea códigos que tus clientes pueden ingresar en el carrito. Pueden dar % de descuento, envío gratis, o ambos.</p>
     <div id="cupones-container"></div>
-    <div style="display:flex;gap:10px;margin-top:16px;margin-bottom:10px">
-      <input type="text" id="nuevo-cupon-codigo" placeholder="CÓDIGO" style="flex:1;border:1px solid var(--gris-claro);border-radius:5px;padding:10px;text-transform:uppercase;font-family:monospace;font-weight:700"/>
-      <input type="number" id="nuevo-cupon-pct" placeholder="% desc." min="1" max="100" style="width:100px;border:1px solid var(--gris-claro);border-radius:5px;padding:10px"/>
+    <div style="display:flex;gap:10px;margin-top:16px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+      <input type="text" id="nuevo-cupon-codigo" placeholder="CÓDIGO" style="flex:1;min-width:140px;border:1px solid var(--gris-claro);border-radius:5px;padding:10px;text-transform:uppercase;font-family:monospace;font-weight:700"/>
+      <input type="number" id="nuevo-cupon-pct" placeholder="% desc." min="0" max="100" style="width:100px;border:1px solid var(--gris-claro);border-radius:5px;padding:10px"/>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;white-space:nowrap">
+        <input type="checkbox" id="nuevo-cupon-envio-gratis" style="width:16px;height:16px"/> Envío gratis
+      </label>
       <button class="btn-guardar" onclick="agregarCupon()" style="white-space:nowrap">+ Agregar</button>
     </div>
+    <p style="font-size:12px;color:var(--gris)">Puedes dejar % en 0 si el cupón solo da envío gratis.</p>
   </div>
 </div>
 
@@ -187,6 +192,19 @@ body{font-family:var(--sans);background:var(--crema);color:var(--carbon);min-hei
   <div class="warning-box">
     📷 Las fotos se guardan como texto (base64) directo en la base de datos y se comprimen automáticamente al subirlas. Usa fotos de buena luz, fondo limpio.
   </div>
+
+  <div class="admin-section">
+    <h2>Logo de la tienda</h2>
+    <p class="sub">Reemplaza el círculo "DM" del encabezado por tu logo.</p>
+    <div style="display:flex;align-items:center;gap:16px">
+      <div id="logo-preview-admin" style="width:60px;height:60px;border-radius:50%;overflow:hidden;background:var(--crema);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--gris)">DM</div>
+      <label class="pa-upload-btn" style="width:60px;height:60px;font-size:22px">
+        +<input type="file" accept="image/*" onchange="subirLogo(this.files[0])"/>
+      </label>
+      <button class="btn-del-cupon" onclick="quitarLogo()">Quitar y usar "DM"</button>
+    </div>
+  </div>
+
   <div class="admin-section">
     <h2>Fotos de productos</h2>
     <p class="sub">Sube hasta 5 fotos por producto. La primera es la foto principal del catálogo.</p>
@@ -195,6 +213,18 @@ body{font-family:var(--sans);background:var(--crema);color:var(--carbon);min-hei
 </div>
 
 <div id="panel-historia" class="admin-panel">
+  <div class="admin-section">
+    <h2>Imagen de "Quiénes somos"</h2>
+    <p class="sub">Reemplaza el rectángulo de la sección "Nuestra historia" por una foto de tu salsa.</p>
+    <div style="display:flex;align-items:center;gap:16px">
+      <div id="historia-img-preview-admin" style="width:90px;height:120px;border-radius:6px;overflow:hidden;background:var(--crema);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--gris);text-align:center">Sin imagen</div>
+      <label class="pa-upload-btn" style="width:60px;height:60px;font-size:22px">
+        +<input type="file" accept="image/*" onchange="subirImagenHistoria(this.files[0])"/>
+      </label>
+      <button class="btn-del-cupon" onclick="quitarImagenHistoria()">Quitar imagen</button>
+    </div>
+  </div>
+
   <div class="admin-section">
     <h2>Quiénes somos</h2>
     <p class="sub">Este texto aparece en la sección "Quiénes somos" de la tienda.</p>
@@ -206,7 +236,33 @@ body{font-family:var(--sans);background:var(--crema);color:var(--carbon);min-hei
   </div>
 </div>
 
-<div class="toast-admin" id="toast-admin"></div>
+<div id="panel-clientes" class="admin-panel">
+  <div class="admin-section">
+    <h2>Base de clientes</h2>
+    <p class="sub">Todos los clientes que han comprado en la tienda online. Exporta el listado para enviarles promociones.</p>
+    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+      <button class="btn-guardar" onclick="exportarClientesCSV()">⬇️ Exportar CSV</button>
+      <button class="btn-guardar" style="background:var(--verde)" onclick="abrirMensajeMasivo()">💬 Mensaje masivo WhatsApp</button>
+    </div>
+    <div id="clientes-stats" style="margin-bottom:16px;font-size:13px;color:var(--gris)"></div>
+    <div style="overflow:auto">
+      <table class="hist-table" id="clientes-tabla">
+        <thead><tr><th>Nombre</th><th>Email</th><th>Teléfono</th><th>Ciudad</th><th>Compras</th><th>Última compra</th><th></th></tr></thead>
+        <tbody id="clientes-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="admin-section" id="mensaje-masivo-box" style="display:none">
+    <h2>Mensaje masivo por WhatsApp</h2>
+    <p class="sub">Escribe el mensaje. Se abrirá una ventana por cada cliente con teléfono registrado, con el mensaje listo para enviar.</p>
+    <div class="qs-field">
+      <label>Mensaje (puedes usar {nombre} para personalizar)</label>
+      <textarea id="msg-masivo" rows="4" placeholder="Ej: Hola {nombre}! Tenemos una promo especial esta semana en Salsa Doña Metiche..."></textarea>
+    </div>
+    <button class="btn-guardar" onclick="enviarMasivoWhatsApp()">💬 Abrir WhatsApp con cada cliente</button>
+  </div>
+</div>
 
 <script>
 let fotosActuales = {};
@@ -235,6 +291,8 @@ function adminInit() {
   cargarCupones();
   cargarFotos();
   cargarQuienesSomos();
+  cargarLogo();
+  cargarImagenHistoria();
 }
 window.adminInit = adminInit;
 
@@ -337,23 +395,35 @@ function renderCupones() {
   const container = document.getElementById('cupones-container');
   const keys = Object.keys(cuponesActuales);
   if (!keys.length) { container.innerHTML = '<p style="font-size:13px;color:var(--gris);margin-bottom:10px">No hay cupones creados todavía.</p>'; return; }
-  container.innerHTML = keys.map(codigo => `
-    <div class="cupon-row">
-      <span class="cupon-codigo">${codigo}</span>
-      <span style="font-size:13px;font-weight:600">${cuponesActuales[codigo]}% de descuento</span>
-      <button class="btn-del-cupon" onclick="eliminarCupon('${codigo}')">Eliminar</button>
-    </div>
-  `).join('');
+  container.innerHTML = keys.map(codigo => {
+    const c = cuponesActuales[codigo];
+    const pct = (typeof c === 'object') ? (c.pct || 0) : (c || 0);
+    const envioGratis = (typeof c === 'object') ? !!c.envioGratis : false;
+    const partes = [];
+    if (pct > 0) partes.push(pct + '% descuento');
+    if (envioGratis) partes.push('envío gratis');
+    return `
+      <div class="cupon-row">
+        <span class="cupon-codigo">${codigo}</span>
+        <span style="font-size:13px;font-weight:600">${partes.join(' + ') || 'sin beneficio'}</span>
+        <button class="btn-del-cupon" onclick="eliminarCupon('${codigo}')">Eliminar</button>
+      </div>
+    `;
+  }).join('');
 }
 
 async function agregarCupon() {
   const codigo = document.getElementById('nuevo-cupon-codigo').value.trim().toUpperCase();
-  const pct = parseFloat(document.getElementById('nuevo-cupon-pct').value);
-  if (!codigo || !pct || pct <= 0 || pct > 100) { toastAdmin('Ingresa un código y un % válido (1-100)'); return; }
+  const pct = parseFloat(document.getElementById('nuevo-cupon-pct').value) || 0;
+  const envioGratis = document.getElementById('nuevo-cupon-envio-gratis').checked;
+  if (!codigo) { toastAdmin('Ingresa un código de cupón'); return; }
+  if (pct < 0 || pct > 100) { toastAdmin('El % debe estar entre 0 y 100'); return; }
+  if (pct === 0 && !envioGratis) { toastAdmin('El cupón debe dar al menos un % o envío gratis'); return; }
   const { ref, set } = window._dbRefs;
-  await set(ref(window._db, 'tienda/cupones/' + codigo), pct);
+  await set(ref(window._db, 'tienda/cupones/' + codigo), { pct, envioGratis });
   document.getElementById('nuevo-cupon-codigo').value = '';
   document.getElementById('nuevo-cupon-pct').value = '';
+  document.getElementById('nuevo-cupon-envio-gratis').checked = false;
   toastAdmin('Cupón ' + codigo + ' creado ✓');
 }
 window.agregarCupon = agregarCupon;
@@ -478,6 +548,168 @@ async function guardarQuienesSomos() {
   toastAdmin('Texto guardado ✓');
 }
 window.guardarQuienesSomos = guardarQuienesSomos;
+
+// ───── LOGO ─────
+function cargarLogo() {
+  const { ref, onValue } = window._dbRefs;
+  onValue(ref(window._db, 'tienda/logo'), snap => {
+    const url = snap.val();
+    const el = document.getElementById('logo-preview-admin');
+    if (el) el.innerHTML = url ? `<img src="${url}" style="width:100%;height:100%;object-fit:cover"/>` : 'DM';
+  });
+}
+
+async function subirLogo(file) {
+  if (!file) return;
+  toastAdmin('Subiendo logo...');
+  try {
+    const dataUrl = await comprimirImagen(file, 300, 0.85);
+    const { ref, set } = window._dbRefs;
+    await set(ref(window._db, 'tienda/logo'), dataUrl);
+    toastAdmin('Logo guardado ✓');
+  } catch (err) {
+    console.error(err);
+    toastAdmin('Error subiendo el logo');
+  }
+}
+window.subirLogo = subirLogo;
+
+async function quitarLogo() {
+  const { ref, remove } = window._dbRefs;
+  await remove(ref(window._db, 'tienda/logo'));
+  toastAdmin('Logo eliminado, se usará "DM"');
+}
+window.quitarLogo = quitarLogo;
+
+// ───── IMAGEN HISTORIA ─────
+function cargarImagenHistoria() {
+  const { ref, onValue } = window._dbRefs;
+  onValue(ref(window._db, 'tienda/imagenHistoria'), snap => {
+    const url = snap.val();
+    const el = document.getElementById('historia-img-preview-admin');
+    if (el) el.innerHTML = url ? `<img src="${url}" style="width:100%;height:100%;object-fit:cover"/>` : 'Sin imagen';
+  });
+}
+
+async function subirImagenHistoria(file) {
+  if (!file) return;
+  toastAdmin('Subiendo imagen...');
+  try {
+    const dataUrl = await comprimirImagen(file, 900, 0.8);
+    const { ref, set } = window._dbRefs;
+    await set(ref(window._db, 'tienda/imagenHistoria'), dataUrl);
+    toastAdmin('Imagen guardada ✓');
+  } catch (err) {
+    console.error(err);
+    toastAdmin('Error subiendo la imagen');
+  }
+}
+window.subirImagenHistoria = subirImagenHistoria;
+
+async function quitarImagenHistoria() {
+  const { ref, remove } = window._dbRefs;
+  await remove(ref(window._db, 'tienda/imagenHistoria'));
+  toastAdmin('Imagen eliminada');
+}
+window.quitarImagenHistoria = quitarImagenHistoria;
+
+// ───── CLIENTES ─────
+let clientesData = {};
+
+function cargarClientes() {
+  const { ref, onValue } = window._dbRefs;
+  onValue(ref(window._db, 'clientes'), snap => {
+    clientesData = snap.val() || {};
+    renderClientes();
+  });
+}
+
+function renderClientes() {
+  const keys = Object.keys(clientesData);
+  const statsEl = document.getElementById('clientes-stats');
+  const bodyEl = document.getElementById('clientes-body');
+  if (!statsEl || !bodyEl) return;
+
+  const conTel = keys.filter(k => clientesData[k].telefono).length;
+  statsEl.textContent = `${keys.length} clientes registrados · ${conTel} con teléfono`;
+
+  if (!keys.length) {
+    bodyEl.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#aaa">Sin clientes todavía</td></tr>';
+    return;
+  }
+
+  const sorted = keys.sort((a, b) =>
+    new Date(clientesData[b].ultimaCompra || 0) - new Date(clientesData[a].ultimaCompra || 0)
+  );
+
+  bodyEl.innerHTML = sorted.map(k => {
+    const c = clientesData[k];
+    const d = c.ultimaCompra ? new Date(c.ultimaCompra).toLocaleDateString('es-MX', {day:'2-digit',month:'short',year:'numeric'}) : '-';
+    return `<tr>
+      <td>${c.nombre} ${c.apellidos || ''}</td>
+      <td style="font-size:12px">${c.email}</td>
+      <td style="font-size:12px">${c.telefono || '-'}</td>
+      <td style="font-size:12px">${c.ciudad || '-'}</td>
+      <td style="text-align:center">${c.totalCompras || 1}</td>
+      <td style="font-size:12px">${d}</td>
+      <td>${c.telefono ? `<button class="btn-del-cupon" style="color:var(--verde)" onclick="waCliente('${k}')">💬</button>` : ''}</td>
+    </tr>`;
+  }).join('');
+}
+
+function waCliente(key) {
+  const c = clientesData[key];
+  if (!c || !c.telefono) return;
+  const tel = c.telefono.replace(/\D/g, '');
+  const msg = `Hola ${c.nombre}! Te escribimos de Salsa Doña Metiche 🌶️ con una promoción especial para ti.`;
+  window.open('https://wa.me/' + tel + '?text=' + encodeURIComponent(msg), '_blank');
+}
+window.waCliente = waCliente;
+
+function abrirMensajeMasivo() {
+  const box = document.getElementById('mensaje-masivo-box');
+  if (box) box.style.display = box.style.display === 'none' ? '' : 'none';
+}
+window.abrirMensajeMasivo = abrirMensajeMasivo;
+
+function enviarMasivoWhatsApp() {
+  const msg = document.getElementById('msg-masivo').value.trim();
+  if (!msg) { toastAdmin('Escribe el mensaje primero'); return; }
+  const clientes = Object.values(clientesData).filter(c => c.telefono);
+  if (!clientes.length) { toastAdmin('No hay clientes con teléfono registrado'); return; }
+  let i = 0;
+  function abrirSiguiente() {
+    if (i >= clientes.length) { toastAdmin('✓ Se abrieron ' + clientes.length + ' ventanas de WhatsApp'); return; }
+    const c = clientes[i++];
+    const tel = c.telefono.replace(/\D/g, '');
+    const texto = msg.replace('{nombre}', c.nombre || '');
+    window.open('https://wa.me/' + tel + '?text=' + encodeURIComponent(texto), '_blank');
+    setTimeout(abrirSiguiente, 800);
+  }
+  abrirSiguiente();
+}
+window.enviarMasivoWhatsApp = enviarMasivoWhatsApp;
+
+function exportarClientesCSV() {
+  const keys = Object.keys(clientesData);
+  if (!keys.length) { toastAdmin('Sin clientes para exportar'); return; }
+  const rows = [['Nombre','Apellidos','Email','Teléfono','Ciudad','Estado','CP','Dirección','Compras','Última compra']];
+  keys.forEach(k => {
+    const c = clientesData[k];
+    rows.push([c.nombre||'', c.apellidos||'', c.email||'', c.telefono||'', c.ciudad||'', c.estado||'', c.cp||'', c.direccion||'', c.totalCompras||1, c.ultimaCompra ? new Date(c.ultimaCompra).toLocaleDateString('es-MX') : '']);
+  });
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(rows.map(r => r.join(',')).join('\n'));
+  a.download = 'clientes_dona_metiche_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+}
+window.exportarClientesCSV = exportarClientesCSV;
+
+// Agregar carga de clientes al init
+const _adminInitOrig = window.adminInit;
+window.adminInit = function() { _adminInitOrig(); cargarClientes(); };
 </script>
+
+<div class="toast-admin" id="toast-admin"></div>
 </body>
 </html>
