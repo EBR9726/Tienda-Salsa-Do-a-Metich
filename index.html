@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Doña Metiche — Salsas Artesanales</title>
 <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script>
@@ -308,12 +308,12 @@ img{display:block;max-width:100%}
 /* ───── CARRITO DRAWER ───── */
 .cart-overlay{position:fixed;inset:0;background:rgba(10,10,10,0.5);z-index:2100;opacity:0;pointer-events:none;transition:opacity .3s}
 .cart-overlay.open{opacity:1;pointer-events:all}
-.cart-drawer{position:fixed;top:0;right:0;width:min(460px,100vw);height:100vh;max-height:100vh;background:var(--blanco);z-index:2101;transform:translateX(100%);transition:transform .4s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column;overflow:hidden}
+.cart-drawer{position:fixed;top:0;right:0;width:min(460px,100vw);height:100vh;height:100dvh;max-height:100vh;max-height:100dvh;background:var(--blanco);z-index:2101;transform:translateX(100%);transition:transform .4s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column;overflow:hidden;padding-bottom:env(safe-area-inset-bottom,0px)}
 .cart-overlay.open .cart-drawer{transform:translateX(0)}
 .cart-header{padding:24px 28px;border-bottom:1px solid var(--gris-claro);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--blanco);z-index:5}
 .cart-header h3{font-family:var(--serif);font-size:21px;font-weight:500}
 .cart-close{background:none;border:none;font-size:22px;color:var(--gris)}
-.cart-body{flex:1 1 auto;overflow-y:auto;padding:20px 28px;min-height:0}
+.cart-body{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px 28px;min-height:0}
 .cart-empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:60%;color:var(--gris);text-align:center;gap:14px}
 .cart-empty-state .seal-icon{width:60px;height:60px;border-radius:50%;background:radial-gradient(circle at 35% 30%, var(--dorado-claro), var(--dorado));opacity:0.3}
 
@@ -338,7 +338,7 @@ img{display:block;max-width:100%}
 .cupon-aplicado{display:flex;justify-content:space-between;align-items:center;background:var(--crema);border-radius:5px;padding:10px 14px;margin:14px 0;font-size:13px}
 .cupon-aplicado .quitar-cupon{color:var(--rojo);background:none;border:none;font-size:12px;text-decoration:underline}
 
-.cart-footer{padding:18px 28px 24px;border-top:1px solid var(--gris-claro);flex-shrink:0;overflow-y:auto;max-height:55vh;-webkit-overflow-scrolling:touch}
+.cart-footer{padding:18px 28px 24px;border-top:1px solid var(--gris-claro);flex-shrink:0;overflow-y:auto;-webkit-overflow-scrolling:touch;max-height:45vh;max-height:45dvh}
 .cart-line{display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:7px;color:var(--gris)}
 .cart-line.verde{color:var(--verde)}
 .cart-total-row{display:flex;justify-content:space-between;font-family:var(--serif);font-size:21px;margin:12px 0 18px;font-weight:500}
