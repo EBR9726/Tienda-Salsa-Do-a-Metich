@@ -1,110 +1,116 @@
 // ════════════════════════════════════════════════════════
-//  DOÑA METICHE — TIENDA — LÓGICA COMPLETA
+//  DOÑA METICHE — TIENDA — app.js
 // ════════════════════════════════════════════════════════
 
 let carrito = [];
-let productoModalActivo = null;
-let fotoActivaIdx = 0;
-let tamanoSeleccionado = null;
 let cuponAplicado = null;
-let pasoCheckout = 'carrito'; // carrito | datos | pago
+let pasoCheckout = 'carrito';
 let datosCliente = {};
+let _modalRecetaActiva = null;
+let _tamanoSel = null;
+let _modalQty = 1;
+let _fotoIdx = 0;
 
-// ─────────────────────────────────────────────────────────
-//  INIT
-// ─────────────────────────────────────────────────────────
-function appInit() {
-  renderCatalogo();
-  renderQuienesSomos();
-  renderCarrito();
+// ── ACCESORES A DATOS GLOBALES ───────────────────────────
+function getRecetas()   { return window.recetas   || {}; }
+function getInventario(){ return window.inventario || {}; }
+function getPrecios()   { return window.precios    || {}; }
+function getPromos()    { return window.promos     || {}; }
+function getEnvios()    { return window.envios     || { costo:100, minimoGratis:700 }; }
+function getCupones()   { return window.cupones    || {}; }
+function getFotosAll()  { return window.fotos      || {}; }
+
+function getProductos() {
+  const prods = [];
+  Object.entries(getRecetas()).forEach(([rid,r]) => {
+    if (!r.activa) return;
+    Object.entries(r.tallas||{}).forEach(([tid,t]) => {
+      const id = rid+'_'+tid;
+      prods.push({
+        id, recetaId:rid, tallaId:tid,
+        nombre: r.nombre+' '+t.ml+'ml',
+        receta: r.nombre, ml: t.ml,
+        precio: getPrecios()[id] !== undefined ? getPrecios()[id] : (t.precio||0),
+        codigo: t.codigo||'',
+        tagline: r.tagline||'',
+        descripcion: r.descripcion||''
+      });
+    });
+  });
+  return prods.sort((a,b)=>a.receta.localeCompare(b.receta)||b.ml-a.ml);
 }
-window.appInit = appInit;
 
-// ─────────────────────────────────────────────────────────
-//  TOAST
-// ─────────────────────────────────────────────────────────
-let toastTimer;
+function getStock(id)    { return getInventario()[id] || 0; }
+function getFotos(id)    { return (getFotosAll()[id] || []); }
+function getPromoCfg(ml) {
+  const d = {235:{cantidad:3,precio:380},120:{cantidad:3,precio:250},29:{cantidad:3,precio:130}};
+  const p = getPromos();
+  return (p && p['p'+ml]) || d[ml] || {cantidad:3,precio:100};
+}
+
+// Exponer para que el módulo Firebase pueda actualizarlos
+window.recetas   = {};
+window.inventario= {};
+window.precios   = {};
+window.promos    = {};
+window.envios    = { costo:100, minimoGratis:700 };
+window.cupones   = {};
+window.fotos     = {};
+
+// ── TOAST ────────────────────────────────────────────────
+let _toastT;
 function toastTienda(msg) {
   const el = document.getElementById('toast-tienda');
-  el.textContent = msg;
-  el.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(_toastT);
+  _toastT = setTimeout(() => el.classList.remove('show'), 2800);
 }
 
-// ─────────────────────────────────────────────────────────
-//  HELPERS DE DATOS
-// ─────────────────────────────────────────────────────────
-function getProductos() { return window._PRODUCTOS || []; }
-function getInventario() { return window._app ? window._app.inventario : {}; }
-function getFotos(productoId) {
-  const fotos = window._app ? window._app.fotosProductos : {};
-  return (fotos && fotos[productoId]) ? fotos[productoId] : [];
-}
-function getRecetaInfo(receta) {
-  return (window._RECETA_INFO && window._RECETA_INFO[receta]) || { tagline: '', descripcion: '' };
-}
-function getPromos() { return window._app ? window._app.promos : {}; }
-function getEnvios() { return window._app ? window._app.envios : { costo: 80, minimoGratis: 600 }; }
-function getCupones() { return window._app ? window._app.cupones : {}; }
-
-function getPromoParaMl(ml) {
-  const promos = getPromos();
-  if (ml === 235) return promos.p235;
-  if (ml === 120) return promos.p120;
-  if (ml === 29) return promos.p29;
-  return null;
-}
-
-// ─────────────────────────────────────────────────────────
-//  RENDER CATÁLOGO — 3 TARJETAS POR RECETA
-// ─────────────────────────────────────────────────────────
+// ── CATÁLOGO ─────────────────────────────────────────────
 function renderCatalogo() {
-  const grid = document.getElementById('recetas-grid');
-  if (!grid) return;
-  const recetas = ['Morita', 'Habanero', 'Chile de árbol'];
-  const productos = getProductos();
-  const inventario = getInventario();
+  const grid = document.getElementById('recetas-grid'); if (!grid) return;
+  const rKeys = Object.keys(getRecetas()).filter(rid => getRecetas()[rid].activa);
+  if (!rKeys.length) { grid.innerHTML = '<p style="color:var(--gris);text-align:center;grid-column:1/-1">Cargando productos...</p>'; return; }
 
-  grid.innerHTML = recetas.map(receta => {
-    // Usamos el tamaño 235ml como representativo del "anuncio"
-    const repPrincipal = productos.find(p => p.receta === receta && p.ml === 235);
-    const todosTamanos = productos.filter(p => p.receta === receta);
-    const stockTotal = todosTamanos.reduce((a, p) => a + (inventario[p.id] || 0), 0);
-    const fotos = getFotos(repPrincipal.id);
-    const fotoPrincipal = fotos[0];
-    const info = getRecetaInfo(receta);
+  grid.innerHTML = rKeys.map(rid => {
+    const r = getRecetas()[rid];
+    const tallas = Object.entries(r.tallas||{}).sort((a,b)=>b[1].ml-a[1].ml);
+    const repTalla = tallas[0]; // mayor talla como representativa
+    if (!repTalla) return '';
+    const [, t] = repTalla;
+    const repId = rid+'_'+repTalla[0];
+    const stockTotal = tallas.reduce((a,[tid])=>a+getStock(rid+'_'+tid),0);
+    const fotosRep = getFotos(repId);
+    const fotoPrincipal = fotosRep[0];
+    const precio = getPrecios()[repId] !== undefined ? getPrecios()[repId] : (t.precio||0);
 
     return `
-      <div class="receta-card" onclick="abrirModalProducto('${receta}')">
+      <div class="receta-card" onclick="abrirModalProducto('${rid}')">
         <div class="rc-img-wrap">
-          ${fotoPrincipal ? `<img src="${fotoPrincipal}" alt="${receta}" loading="lazy"/>` : `<div class="rc-img-placeholder"><div class="ph-jar"></div></div>`}
-          ${stockTotal < 1 ? `<span class="rc-badge" style="background:rgba(139,26,26,0.92)">Agotado</span>` : `<span class="rc-badge">Artesanal</span>`}
+          ${fotoPrincipal
+            ? `<img src="${fotoPrincipal}" alt="${r.nombre}" loading="lazy"/>`
+            : `<div class="rc-img-placeholder"><div class="ph-jar"></div></div>`}
+          <span class="rc-badge">${stockTotal < 1 ? 'Agotado' : 'Artesanal'}</span>
           <div class="rc-quickview">→</div>
         </div>
-        <div class="rc-nombre">${receta}</div>
-        <div class="rc-tagline">${info.tagline}</div>
-        <div class="rc-price-row">
-          <span class="rc-price">$${repPrincipal.precio}<span> / 235ml</span></span>
-        </div>
-      </div>
-    `;
+        <div class="rc-nombre">${r.nombre}</div>
+        <div class="rc-tagline">${r.tagline||''}</div>
+        <div class="rc-precio">$${precio}<span> / ${t.ml}ml</span></div>
+      </div>`;
   }).join('');
 }
 window.renderCatalogo = renderCatalogo;
 
-// ─────────────────────────────────────────────────────────
-//  MODAL DE PRODUCTO — con selector de tamaño y cantidad
-// ─────────────────────────────────────────────────────────
-function abrirModalProducto(receta) {
-  productoModalActivo = receta;
-  fotoActivaIdx = 0;
-  const productos = getProductos().filter(p => p.receta === receta);
-  const inventario = getInventario();
-  // Seleccionar por default el primer tamaño con stock, o 235ml si no hay stock en ninguno
-  const conStock = productos.find(p => (inventario[p.id] || 0) > 0);
-  tamanoSeleccionado = (conStock || productos.find(p => p.ml === 235)).id;
-  window._modalQty = 1;
+// ── MODAL DE PRODUCTO ────────────────────────────────────
+function abrirModalProducto(recetaId) {
+  _modalRecetaActiva = recetaId;
+  window._modalRecetaActiva = recetaId;
+  _fotoIdx = 0;
+  const r = getRecetas()[recetaId]; if (!r) return;
+  const tallas = Object.entries(r.tallas||{}).sort((a,b)=>b[1].ml-a[1].ml);
+  const conStock = tallas.find(([tid]) => getStock(recetaId+'_'+tid) > 0);
+  _tamanoSel = (conStock || tallas[0])?.[0] || null;
+  _modalQty = 1;
   renderProductoActivo();
   document.getElementById('modal-producto-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
@@ -114,220 +120,208 @@ window.abrirModalProducto = abrirModalProducto;
 function cerrarModalProducto() {
   document.getElementById('modal-producto-overlay').classList.remove('open');
   document.body.style.overflow = '';
-  productoModalActivo = null;
+  _modalRecetaActiva = null;
+  window._modalRecetaActiva = null;
 }
 window.cerrarModalProducto = cerrarModalProducto;
 
-function seleccionarTamano(productoId) {
-  tamanoSeleccionado = productoId;
-  window._modalQty = 1;
-  fotoActivaIdx = 0;
+function seleccionarTamano(tid) {
+  _tamanoSel = tid; _modalQty = 1; _fotoIdx = 0;
   renderProductoActivo();
 }
 window.seleccionarTamano = seleccionarTamano;
 
+function setFotoActiva(idx) { _fotoIdx = idx; renderProductoActivo(); }
+window.setFotoActiva = setFotoActiva;
+
 function renderProductoActivo() {
-  if (!productoModalActivo) return;
-  const receta = productoModalActivo;
-  const productosReceta = getProductos().filter(p => p.receta === receta).sort((a, b) => b.ml - a.ml);
-  const pActivo = productosReceta.find(p => p.id === tamanoSeleccionado) || productosReceta[0];
-  const inventario = getInventario();
-  const stock = inventario[pActivo.id] || 0;
-  const fotos = getFotos(pActivo.id);
-  const info = getRecetaInfo(receta);
+  if (!_modalRecetaActiva) return;
+  const rid = _modalRecetaActiva;
+  const r = getRecetas()[rid]; if (!r) return;
+  const tallas = Object.entries(r.tallas||{}).sort((a,b)=>b[1].ml-a[1].ml);
+  if (!_tamanoSel && tallas[0]) _tamanoSel = tallas[0][0];
+  const tallaActiva = r.tallas?.[_tamanoSel];
+  if (!tallaActiva) return;
+  const prodId = rid+'_'+_tamanoSel;
+  const stock = getStock(prodId);
+  const precio = getPrecios()[prodId] !== undefined ? getPrecios()[prodId] : (tallaActiva.precio||0);
+  const fotosArr = getFotos(prodId);
+  const fotoMain = fotosArr[_fotoIdx];
 
-  const galeriaThumbsHtml = fotos.length > 1
-    ? `<div class="modal-gallery-thumbs">${fotos.map((f, i) => `<div class="modal-thumb ${i === fotoActivaIdx ? 'active' : ''}" onclick="setFotoActiva(${i})"><img src="${f}" loading="lazy"/></div>`).join('')}</div>`
+  const thumbsHtml = fotosArr.length > 1
+    ? `<div class="modal-gallery-thumbs">${fotosArr.map((f,i)=>`<div class="modal-thumb ${i===_fotoIdx?'active':''}" onclick="setFotoActiva(${i})"><img src="${f}" loading="lazy"/></div>`).join('')}</div>`
     : '';
-  const fotoMain = fotos[fotoActivaIdx];
 
-  const tamanosHtml = productosReceta.map(p => {
-    const s = inventario[p.id] || 0;
-    return `
-      <button class="tamano-btn ${p.id === pActivo.id ? 'active' : ''} ${s < 1 ? 'sin-stock' : ''}" onclick="seleccionarTamano('${p.id}')">
-        <div class="tb-ml">${p.ml} ml</div>
-        <div class="tb-precio">$${p.precio}</div>
-        <div class="tb-stock">${s < 1 ? 'Sin stock' : s + ' disp.'}</div>
-      </button>
-    `;
+  const tamanosHtml = tallas.map(([tid,t]) => {
+    const s = getStock(rid+'_'+tid);
+    const p = getPrecios()[rid+'_'+tid] !== undefined ? getPrecios()[rid+'_'+tid] : (t.precio||0);
+    return `<button class="tamano-btn ${tid===_tamanoSel?'active':''} ${s<1?'sin-stock':''}" onclick="seleccionarTamano('${tid}')">
+      <div class="tb-ml">${t.ml} ml</div>
+      <div class="tb-precio">$${p}</div>
+      <div class="tb-stock">${s<1?'Sin stock':s+' disp.'}</div>
+    </button>`;
   }).join('');
 
-  const content = document.getElementById('modal-producto-content');
-  content.innerHTML = `
+  document.getElementById('modal-producto-content').innerHTML = `
     <button class="modal-close" onclick="cerrarModalProducto()">✕</button>
     <div class="modal-gallery">
       <div class="modal-gallery-main">
-        ${fotoMain ? `<img src="${fotoMain}" alt="${receta}"/>` : `<div class="rc-img-placeholder"><div class="ph-jar"></div></div>`}
+        ${fotoMain ? `<img src="${fotoMain}" alt="${r.nombre}"/>` : `<div class="rc-img-placeholder" style="height:100%"><div class="ph-jar"></div></div>`}
       </div>
-      ${galeriaThumbsHtml}
+      ${thumbsHtml}
     </div>
     <div class="modal-info">
-      <div class="modal-receta">${receta}</div>
-      <h2 class="modal-nombre">${receta}</h2>
-      <p class="modal-tagline">${info.tagline}</p>
-      <p class="modal-descripcion">${info.descripcion}</p>
-
+      <div class="modal-receta">${r.nombre}</div>
+      <h2 class="modal-nombre">${r.nombre}</h2>
+      <p class="modal-tagline">${r.tagline||''}</p>
+      <p class="modal-descripcion">${r.descripcion||''}</p>
       <div class="tamano-selector">
         <label>Elige el tamaño</label>
         <div class="tamano-opciones">${tamanosHtml}</div>
       </div>
-
-      <div class="modal-precio-display">$${pActivo.precio} MXN</div>
-      <div class="modal-stock-info ${stock < 5 ? 'low' : ''}">
-        ${stock < 1 ? 'Sin existencias por el momento' : stock < 5 ? `Solo quedan ${stock} piezas` : `${stock} piezas disponibles`}
+      <div class="modal-precio-display">$${precio} MXN</div>
+      <div class="modal-stock-info ${stock<5?'low':''}">
+        ${stock<1?'Sin existencias por el momento':stock<5?`Solo quedan ${stock} piezas`:`${stock} piezas disponibles`}
       </div>
       <div class="modal-qty-row">
         <label>Cantidad</label>
         <div class="qty-control">
           <button onclick="cambiarQtyModal(-1)">−</button>
-          <span id="modal-qty-display">${window._modalQty}</span>
+          <span id="modal-qty-display">${_modalQty}</span>
           <button onclick="cambiarQtyModal(1)">+</button>
         </div>
       </div>
-      <div class="modal-actions">
-        <button class="btn-add-cart" onclick="agregarAlCarritoDesdeModal('${pActivo.id}')" ${stock < 1 ? 'disabled' : ''}>
-          ${stock < 1 ? 'Sin stock' : 'Agregar al carrito'}
-        </button>
-      </div>
-    </div>
-  `;
+      <button class="btn-add-cart" onclick="agregarAlCarritoDesdeModal('${prodId}')" ${stock<1?'disabled':''}>
+        ${stock<1?'Sin stock':'Agregar al carrito'}
+      </button>
+    </div>`;
 }
 window.renderProductoActivo = renderProductoActivo;
 
-function setFotoActiva(idx) { fotoActivaIdx = idx; renderProductoActivo(); }
-window.setFotoActiva = setFotoActiva;
-
-function cambiarQtyModal(delta) {
-  const p = getProductos().find(x => x.id === tamanoSeleccionado);
-  const stock = getInventario()[p.id] || 0;
-  window._modalQty = Math.max(1, Math.min((window._modalQty || 1) + delta, stock || 1));
-  document.getElementById('modal-qty-display').textContent = window._modalQty;
+function cambiarQtyModal(d) {
+  const stock = getStock(`${_modalRecetaActiva}_${_tamanoSel}`);
+  _modalQty = Math.max(1, Math.min((_modalQty||1)+d, stock||1));
+  const el = document.getElementById('modal-qty-display');
+  if (el) el.textContent = _modalQty;
 }
 window.cambiarQtyModal = cambiarQtyModal;
 
-function agregarAlCarritoDesdeModal(productoId) {
-  const qty = window._modalQty || 1;
-  agregarAlCarrito(productoId, qty);
+function agregarAlCarritoDesdeModal(prodId) {
+  agregarAlCarrito(prodId, _modalQty||1);
   cerrarModalProducto();
 }
 window.agregarAlCarritoDesdeModal = agregarAlCarritoDesdeModal;
 
-// ─────────────────────────────────────────────────────────
-//  CARRITO
-// ─────────────────────────────────────────────────────────
-function agregarAlCarrito(productoId, qty = 1) {
-  const p = getProductos().find(x => x.id === productoId);
-  if (!p) return;
-  const stock = getInventario()[p.id] || 0;
-  const existente = carrito.find(c => c.id === productoId);
-  const enCarrito = existente ? existente.qty : 0;
-
-  if (enCarrito + qty > stock) { toastTienda('No hay suficiente stock disponible'); return; }
-
-  if (existente) existente.qty += qty;
-  else carrito.push({ id: p.id, nombre: p.receta + ' ' + p.ml + 'ml', receta: p.receta, ml: p.ml, precio: p.precio, qty });
-
+// ── CARRITO ──────────────────────────────────────────────
+function agregarAlCarrito(prodId, qty=1) {
+  const p = getProductos().find(x=>x.id===prodId); if (!p) return;
+  const stock = getStock(prodId);
+  const enCarrito = carrito.filter(c=>!c.promo&&c.id===prodId).reduce((a,c)=>a+c.qty,0);
+  const enPromo = carrito.filter(c=>c.promo&&c.lineas).reduce((a,c)=>{
+    const l=c.lineas.find(x=>x.id===prodId); return a+(l?l.qty*c.qty:0);},0);
+  if (enCarrito+enPromo+qty > stock) { toastTienda('No hay suficiente stock'); return; }
+  const ex = carrito.find(c=>!c.promo&&c.id===prodId);
+  if (ex) ex.qty += qty;
+  else carrito.push({id:p.id,nombre:p.nombre,receta:p.receta,ml:p.ml,precio:p.precio,qty});
+  verificarPromos();
   renderCarrito();
-  toastTienda(`${p.receta} ${p.ml}ml agregado al carrito`);
+  toastTienda(`${p.nombre} agregado al carrito`);
 }
 window.agregarAlCarrito = agregarAlCarrito;
 
-function quitarDelCarrito(idx) { carrito.splice(idx, 1); renderCarrito(); }
+function verificarPromos() {
+  const mls = [...new Set(getProductos().map(p=>p.ml))];
+  mls.forEach(ml => {
+    const itemsML = carrito.filter(c=>!c.promo&&c.ml===ml);
+    const totalUnd = itemsML.reduce((a,c)=>a+c.qty,0);
+    const cfg = getPromoCfg(ml);
+    if (totalUnd < cfg.cantidad) return;
+    const grupos = Math.floor(totalUnd/cfg.cantidad);
+    const precioUnit = getProductos().find(p=>p.ml===ml)?.precio || 0;
+    let porAsignar = grupos*cfg.cantidad;
+    const lineas = [];
+    for (const item of itemsML) {
+      if (porAsignar<=0) break;
+      const tomar = Math.min(item.qty, porAsignar);
+      if (tomar>0) { lineas.push({id:item.id,receta:item.receta,nombre:item.nombre,qty:tomar}); porAsignar-=tomar; }
+    }
+    let restante = grupos*cfg.cantidad;
+    for (const item of itemsML) {
+      if (restante<=0) break;
+      const q = Math.min(item.qty,restante); item.qty-=q; restante-=q;
+    }
+    carrito = carrito.filter(c=>c.qty>0);
+    const desc = lineas.map(l=>l.receta.split(' ')[0]+'x'+l.qty).join(', ');
+    carrito.push({promo:'p'+ml,nombre:'Promo '+cfg.cantidad+'x'+ml+'ml',desglose:desc,ml,
+      precio:cfg.precio*grupos,precioUnitarioNormal:precioUnit,qty:grupos,lineas});
+  });
+}
+
+function quitarDelCarrito(idx) { carrito.splice(idx,1); renderCarrito(); }
 window.quitarDelCarrito = quitarDelCarrito;
 
-function cambiarQtyCarrito(idx, delta) {
+function cambiarQtyCarrito(idx,d) {
   const c = carrito[idx];
-  const stock = getInventario()[c.id] || 0;
-  const nuevaQty = c.qty + delta;
-  if (nuevaQty < 1) { carrito.splice(idx, 1); }
-  else if (nuevaQty > stock) { toastTienda('No hay más stock disponible'); }
-  else { c.qty = nuevaQty; }
+  if (c.promo) {
+    const nuevaQty = c.qty+d;
+    if (nuevaQty<1) carrito.splice(idx,1);
+    else { const cfg=getPromoCfg(c.ml); c.qty=nuevaQty; c.precio=cfg.precio*nuevaQty; }
+  } else {
+    const s = getStock(c.id);
+    const nueva = c.qty+d;
+    if (nueva<1) carrito.splice(idx,1);
+    else if (nueva>s) toastTienda('Sin más stock');
+    else c.qty = nueva;
+  }
+  verificarPromos();
   renderCarrito();
 }
 window.cambiarQtyCarrito = cambiarQtyCarrito;
 
-// ─────────────────────────────────────────────────────────
-//  CÁLCULO DE TOTALES (con promos automáticas por ml)
-// ─────────────────────────────────────────────────────────
+// ── CÁLCULO DE TOTALES ───────────────────────────────────
 function calcularDesglose() {
-  // Agrupar por ml para detectar promos
-  const porMl = {};
+  let subtotal=0, descPromo=0;
   carrito.forEach(c => {
-    porMl[c.ml] = porMl[c.ml] || [];
-    porMl[c.ml].push(c);
-  });
-
-  let subtotal = 0;
-  let descuentoPromo = 0;
-  const detalleLineas = [];
-
-  Object.keys(porMl).forEach(mlStr => {
-    const ml = parseInt(mlStr);
-    const items = porMl[ml];
-    const totalUnidades = items.reduce((a, c) => a + c.qty, 0);
-    const promo = getPromoParaMl(ml);
-    const precioNormalUnit = items[0].precio;
-
-    if (promo && promo.cantidad > 0 && totalUnidades >= promo.cantidad) {
-      const grupos = Math.floor(totalUnidades / promo.cantidad);
-      const resto = totalUnidades - grupos * promo.cantidad;
-      const totalSinPromo = totalUnidades * precioNormalUnit;
-      const totalConPromo = grupos * promo.precio + resto * precioNormalUnit;
-      subtotal += totalSinPromo;
-      descuentoPromo += totalSinPromo - totalConPromo;
-      detalleLineas.push({
-        tipo: 'promo', ml, grupos, resto, cantidadPromo: promo.cantidad,
-        precioPromo: promo.precio, items: items.map(i => ({ nombre: i.nombre, qty: i.qty }))
-      });
+    if (c.promo) {
+      const cfg = getPromoCfg(c.ml);
+      const sinPromo = c.precioUnitarioNormal * cfg.cantidad * c.qty;
+      subtotal += sinPromo; descPromo += sinPromo - c.precio;
     } else {
-      const total = totalUnidades * precioNormalUnit;
-      subtotal += total;
-      detalleLineas.push({ tipo: 'normal', ml, items: items.map(i => ({ nombre: i.nombre, qty: i.qty, precio: i.precio })) });
+      subtotal += c.precio*c.qty;
     }
   });
+  const despuesPromo = subtotal - descPromo;
 
-  const despuesPromo = subtotal - descuentoPromo;
-
-  let descuentoCupon = 0;
-  let cuponEnvioGratis = false;
+  let descCupon=0, cuponEnvioGratis=false;
   if (cuponAplicado) {
-    const cupones = getCupones();
-    const cuponData = cupones[cuponAplicado];
-    const pct = (typeof cuponData === 'object') ? (cuponData.pct || 0) : (cuponData || 0);
-    cuponEnvioGratis = (typeof cuponData === 'object') ? !!cuponData.envioGratis : false;
-    if (pct) descuentoCupon = Math.round(despuesPromo * pct / 100);
+    const cData = getCupones()[cuponAplicado];
+    const pct = typeof cData==='object' ? (cData.pct||0) : (cData||0);
+    cuponEnvioGratis = typeof cData==='object' ? !!cData.envioGratis : false;
+    if (pct) descCupon = Math.round(despuesPromo*pct/100);
   }
+  const despuesCupon = despuesPromo - descCupon;
 
-  const despuesCupon = despuesPromo - descuentoCupon;
-
-  const envios = getEnvios();
-  let costoEnvio = envios.costo || 0;
+  const env = getEnvios();
+  let costoEnvio = env.costo||0;
   let envioGratis = false;
-  if (cuponEnvioGratis) {
-    costoEnvio = 0;
-    envioGratis = true;
-  } else if (envios.minimoGratis > 0 && despuesCupon >= envios.minimoGratis) {
-    costoEnvio = 0;
-    envioGratis = true;
-  }
+  if (cuponEnvioGratis) { costoEnvio=0; envioGratis=true; }
+  else if (env.minimoGratis>0 && despuesCupon>=env.minimoGratis) { costoEnvio=0; envioGratis=true; }
 
-  const total = despuesCupon + costoEnvio;
-
-  return { subtotal, descuentoPromo, despuesPromo, descuentoCupon, despuesCupon, costoEnvio, envioGratis, cuponEnvioGratis, total, detalleLineas, envios };
+  return { subtotal, descPromo, despuesPromo, descCupon, despuesCupon, costoEnvio, envioGratis, total:despuesCupon+costoEnvio };
 }
 
-// ─────────────────────────────────────────────────────────
-//  RENDER CARRITO
-// ─────────────────────────────────────────────────────────
+// ── RENDER CARRITO ───────────────────────────────────────
 function renderCarrito() {
-  const totalItems = carrito.reduce((a, c) => a + c.qty, 0);
+  const totalItems = carrito.reduce((a,c)=>a+c.qty,0);
   document.getElementById('cart-count').textContent = totalItems;
-
-  if (pasoCheckout === 'carrito') renderPasoCarrito();
-  else if (pasoCheckout === 'datos') renderPasoDatos();
-  else if (pasoCheckout === 'pago') renderPasoPago();
+  if (pasoCheckout==='carrito') renderPasoCarrito();
+  else if (pasoCheckout==='datos') renderPasoDatos();
+  else if (pasoCheckout==='pago') renderPasoPago();
 }
 window.renderCarrito = renderCarrito;
+
+function renderCarritoBody() { renderCarrito(); }
+window.renderCarritoBody = renderCarritoBody;
 
 function renderPasoCarrito() {
   document.getElementById('cart-title').textContent = 'Tu carrito';
@@ -335,460 +329,344 @@ function renderPasoCarrito() {
   const footerEl = document.getElementById('cart-footer');
 
   if (!carrito.length) {
-    bodyEl.innerHTML = `<div class="cart-empty-state"><div class="seal-icon"></div><div>Tu carrito está vacío</div></div>`;
+    bodyEl.innerHTML = '<div class="cart-empty-state"><div style="font-size:48px">🛒</div><div>Tu carrito está vacío</div></div>';
     footerEl.innerHTML = '';
     return;
   }
 
-  bodyEl.innerHTML = carrito.map((c, i) => {
-    const fotos = getFotos(c.id);
+  bodyEl.innerHTML = carrito.map((c,i) => {
+    const fotos = getFotos(c.id||'');
     const foto = fotos[0];
-    return `
-      <div class="cart-item">
-        <div class="cart-item-img">${foto ? `<img src="${foto}"/>` : ''}</div>
-        <div class="cart-item-body">
-          <div class="cart-item-name">${c.nombre}</div>
-          <div class="cart-item-bottom">
-            <div class="cart-qty-control">
-              <button onclick="cambiarQtyCarrito(${i},-1)">−</button>
-              <span>${c.qty}</span>
-              <button onclick="cambiarQtyCarrito(${i},1)">+</button>
-            </div>
-            <span class="cart-item-price">$${c.precio * c.qty}</span>
+    return `<div class="cart-item">
+      <div class="cart-item-img">${foto?`<img src="${foto}"/>`:'<div style="width:100%;height:100%;background:var(--crema)"></div>'}</div>
+      <div class="cart-item-body">
+        <div class="cart-item-name">${c.nombre}${c.promo?`<br><span style="font-size:10px;color:var(--gris)">${c.desglose}</span>`:''}</div>
+        <div class="cart-item-bottom">
+          <div class="cart-qty-c">
+            <button onclick="cambiarQtyCarrito(${i},-1)">−</button>
+            <span>${c.qty}</span>
+            <button onclick="cambiarQtyCarrito(${i},1)">+</button>
           </div>
-          <button class="cart-item-remove" onclick="quitarDelCarrito(${i})" style="margin-top:6px;align-self:flex-start">Quitar</button>
+          <span class="cart-item-price">$${c.promo?c.precio:c.precio*c.qty}</span>
         </div>
+        <button class="cart-item-remove" onclick="quitarDelCarrito(${i})" style="margin-top:4px;align-self:flex-start">Quitar</button>
       </div>
-    `;
+    </div>`;
   }).join('');
 
-  const desglose = calcularDesglose();
-
-  const promoActivaHtml = desglose.detalleLineas.filter(l => l.tipo === 'promo').map(l =>
-    `<div class="promo-banner">🏷️ Promo ${l.ml}ml aplicada (${l.cantidadPromo} piezas = $${l.precioPromo})${l.resto > 0 ? ` · ${l.resto} pieza(s) extra a precio normal` : ''}</div>`
-  ).join('');
+  const dg = calcularDesglose();
+  const promosActivas = carrito.filter(c=>c.promo);
+  const promoHtml = promosActivas.map(c=>`<div class="promo-banner">🏷️ Promo ${c.ml}ml aplicada — ${c.desglose}</div>`).join('');
 
   const cuponHtml = cuponAplicado
-    ? `<div class="cupon-aplicado"><span>🎟️ ${cuponAplicado} aplicado</span><button class="quitar-cupon" onclick="quitarCupon()">Quitar</button></div>`
+    ? `<div class="cupon-aplicado"><span>🎟️ ${cuponAplicado}</span><button class="quitar-cupon" onclick="quitarCupon()">Quitar</button></div>`
     : `<div class="cupon-box"><input type="text" id="cupon-input" placeholder="Código de cupón"/><button onclick="aplicarCupon()">Aplicar</button></div>`;
 
   footerEl.innerHTML = `
-    ${promoActivaHtml}
-    ${cuponHtml}
-    <div class="cart-line"><span>Subtotal</span><span>$${desglose.subtotal}</span></div>
-    ${desglose.descuentoPromo > 0 ? `<div class="cart-line verde"><span>Descuento promo</span><span>-$${desglose.descuentoPromo}</span></div>` : ''}
-    ${desglose.descuentoCupon > 0 ? `<div class="cart-line verde"><span>Cupón</span><span>-$${desglose.descuentoCupon}</span></div>` : ''}
-    <div class="cart-line"><span>Envío</span><span>${desglose.envioGratis ? 'Gratis' : '$' + desglose.costoEnvio}</span></div>
-    <div class="cart-total-row"><span>Total</span><span>$${desglose.total}</span></div>
-    <button class="btn-continuar" onclick="irAPasoDatos()">Continuar con mis datos</button>
-  `;
+    ${promoHtml}${cuponHtml}
+    <div class="cart-line"><span>Subtotal</span><span>$${dg.subtotal}</span></div>
+    ${dg.descPromo>0?`<div class="cart-line verde"><span>Ahorro promo</span><span>-$${dg.descPromo}</span></div>`:''}
+    ${dg.descCupon>0?`<div class="cart-line verde"><span>Cupón ${cuponAplicado}</span><span>-$${dg.descCupon}</span></div>`:''}
+    <div class="cart-line"><span>Envío</span><span>${dg.envioGratis?'Gratis':'$'+dg.costoEnvio}</span></div>
+    <div class="cart-total-row"><span>Total</span><span>$${dg.total}</span></div>
+    <button class="btn-continuar" onclick="irAPasoDatos()">Continuar con mis datos</button>`;
 }
 
+function renderResumenCarrito() { if (pasoCheckout==='carrito'&&carrito.length) renderPasoCarrito(); }
+window.renderResumenCarrito = renderResumenCarrito;
+
 function aplicarCupon() {
-  const input = document.getElementById('cupon-input');
-  const codigo = input.value.trim().toUpperCase();
-  const cupones = getCupones();
+  const codigo = document.getElementById('cupon-input')?.value.trim().toUpperCase();
   if (!codigo) return;
-  if (!cupones[codigo]) { toastTienda('Cupón no válido'); return; }
+  const cData = getCupones()[codigo];
+  if (!cData && cData!==0) { toastTienda('Cupón no válido'); return; }
   cuponAplicado = codigo;
+  const pct = typeof cData==='object'?(cData.pct||0):(cData||0);
+  const envioG = typeof cData==='object'?!!cData.envioGratis:false;
+  const partes=[]; if(pct>0) partes.push(pct+'% descuento'); if(envioG) partes.push('envío gratis');
   renderCarrito();
-  const cuponData = cupones[codigo];
-  const pct = (typeof cuponData === 'object') ? (cuponData.pct || 0) : (cuponData || 0);
-  const envioGratis = (typeof cuponData === 'object') ? !!cuponData.envioGratis : false;
-  const partes = [];
-  if (pct > 0) partes.push(pct + '% de descuento');
-  if (envioGratis) partes.push('envío gratis');
-  toastTienda(`Cupón ${codigo} aplicado: ${partes.join(' + ')}`);
+  toastTienda(`Cupón ${codigo}: ${partes.join(' + ')}`);
 }
 window.aplicarCupon = aplicarCupon;
 
-function quitarCupon() { cuponAplicado = null; renderCarrito(); }
+function quitarCupon() { cuponAplicado=null; renderCarrito(); }
 window.quitarCupon = quitarCupon;
 
-// ─────────────────────────────────────────────────────────
-//  PASO 2 — DATOS DEL CLIENTE
-// ─────────────────────────────────────────────────────────
+// ── PASO 2: DATOS ────────────────────────────────────────
 function irAPasoDatos() {
   if (!carrito.length) return;
-  pasoCheckout = 'datos';
-  renderCarrito();
+  pasoCheckout = 'datos'; renderCarrito();
 }
 window.irAPasoDatos = irAPasoDatos;
 
 function renderPasoDatos() {
-  document.getElementById('cart-title').textContent = 'Tus datos de envío';
-  const bodyEl = document.getElementById('cart-body');
-  const footerEl = document.getElementById('cart-footer');
-
-  bodyEl.innerHTML = `
+  document.getElementById('cart-title').textContent = 'Datos de envío';
+  const d = datosCliente;
+  document.getElementById('cart-body').innerHTML = `
     <div class="form-row">
-      <div class="form-field"><label>Nombre</label><input type="text" id="dc-nombre" value="${datosCliente.nombre || ''}"/></div>
-      <div class="form-field"><label>Apellidos</label><input type="text" id="dc-apellidos" value="${datosCliente.apellidos || ''}"/></div>
+      <div class="form-field"><label>Nombre</label><input id="dc-nombre" value="${d.nombre||''}"/></div>
+      <div class="form-field"><label>Apellidos</label><input id="dc-apellidos" value="${d.apellidos||''}"/></div>
     </div>
-    <div class="form-field"><label>Correo electrónico</label><input type="email" id="dc-email" value="${datosCliente.email || ''}"/></div>
-    <div class="form-field"><label>Teléfono</label><input type="tel" id="dc-telefono" value="${datosCliente.telefono || ''}"/></div>
-    <div class="form-field"><label>Dirección (calle y número)</label><input type="text" id="dc-direccion" value="${datosCliente.direccion || ''}"/></div>
+    <div class="form-field"><label>Correo electrónico</label><input type="email" id="dc-email" value="${d.email||''}"/></div>
+    <div class="form-field"><label>Teléfono</label><input type="tel" id="dc-telefono" value="${d.telefono||''}"/></div>
+    <div class="form-field"><label>Calle y número</label><input id="dc-direccion" value="${d.direccion||''}"/></div>
     <div class="form-row">
-      <div class="form-field"><label>Colonia</label><input type="text" id="dc-colonia" value="${datosCliente.colonia || ''}"/></div>
-      <div class="form-field"><label>C.P.</label><input type="text" id="dc-cp" value="${datosCliente.cp || ''}"/></div>
+      <div class="form-field"><label>Colonia</label><input id="dc-colonia" value="${d.colonia||''}"/></div>
+      <div class="form-field"><label>C.P.</label><input id="dc-cp" value="${d.cp||''}"/></div>
     </div>
     <div class="form-row">
-      <div class="form-field"><label>Ciudad</label><input type="text" id="dc-ciudad" value="${datosCliente.ciudad || ''}"/></div>
-      <div class="form-field"><label>Estado</label><input type="text" id="dc-estado" value="${datosCliente.estado || ''}"/></div>
+      <div class="form-field"><label>Ciudad</label><input id="dc-ciudad" value="${d.ciudad||''}"/></div>
+      <div class="form-field"><label>Estado</label><input id="dc-estado" value="${d.estado||''}"/></div>
     </div>
-    <div class="form-field"><label>Referencias (opcional)</label><textarea id="dc-referencias" rows="2">${datosCliente.referencias || ''}</textarea></div>
-  `;
-
-  footerEl.innerHTML = `
+    <div class="form-field"><label>Referencias (opcional)</label><input id="dc-referencias" value="${d.referencias||''}"/></div>`;
+  document.getElementById('cart-footer').innerHTML = `
     <button class="btn-continuar" onclick="irAPasoPago()">Continuar al pago</button>
-    <button class="btn-volver" onclick="volverACarrito()">← Volver al carrito</button>
-  `;
+    <button class="btn-volver" onclick="volverACarrito()">← Volver al carrito</button>`;
 }
 
-function volverACarrito() { pasoCheckout = 'carrito'; renderCarrito(); }
+function volverACarrito() { pasoCheckout='carrito'; renderCarrito(); }
 window.volverACarrito = volverACarrito;
 
 function irAPasoPago() {
-  const nombre = document.getElementById('dc-nombre').value.trim();
-  const apellidos = document.getElementById('dc-apellidos').value.trim();
-  const email = document.getElementById('dc-email').value.trim();
-  const direccion = document.getElementById('dc-direccion').value.trim();
-  const colonia = document.getElementById('dc-colonia').value.trim();
-  const cp = document.getElementById('dc-cp').value.trim();
-  const ciudad = document.getElementById('dc-ciudad').value.trim();
-  const estado = document.getElementById('dc-estado').value.trim();
-
-  if (!nombre || !apellidos || !email || !direccion || !colonia || !cp || !ciudad || !estado) {
-    toastTienda('Por favor completa todos los campos obligatorios');
-    return;
-  }
-  if (!email.includes('@') || !email.includes('.')) {
-    toastTienda('Ingresa un correo electrónico válido');
-    return;
-  }
-
+  const campos = ['dc-nombre','dc-apellidos','dc-email','dc-direccion','dc-colonia','dc-cp','dc-ciudad','dc-estado'];
+  const vals = campos.map(id=>document.getElementById(id)?.value.trim());
+  if (vals.some(v=>!v)) { toastTienda('Completa todos los campos obligatorios'); return; }
+  if (!vals[2].includes('@')) { toastTienda('Correo electrónico inválido'); return; }
   datosCliente = {
-    nombre, apellidos, email,
-    telefono: document.getElementById('dc-telefono').value.trim(),
-    direccion, colonia, cp, ciudad, estado,
-    referencias: document.getElementById('dc-referencias').value.trim()
+    nombre:vals[0], apellidos:vals[1], email:vals[2],
+    telefono: document.getElementById('dc-telefono')?.value.trim()||'',
+    direccion:vals[3], colonia:vals[4], cp:vals[5], ciudad:vals[6], estado:vals[7],
+    referencias: document.getElementById('dc-referencias')?.value.trim()||''
   };
-
-  pasoCheckout = 'pago';
-  renderCarrito();
+  pasoCheckout='pago'; renderCarrito();
 }
 window.irAPasoPago = irAPasoPago;
 
-// ─────────────────────────────────────────────────────────
-//  PASO 3 — PAGO
-// ─────────────────────────────────────────────────────────
+// ── PASO 3: PAGO ─────────────────────────────────────────
 function renderPasoPago() {
   document.getElementById('cart-title').textContent = 'Confirmar y pagar';
-  const bodyEl = document.getElementById('cart-body');
-  const footerEl = document.getElementById('cart-footer');
-  const desglose = calcularDesglose();
+  const dg = calcularDesglose();
+  const c = datosCliente;
 
-  bodyEl.innerHTML = `
-    <div class="resumen-direccion">
+  document.getElementById('cart-body').innerHTML = `
+    <div class="resumen-dir">
       <strong>Enviar a</strong>
-      ${datosCliente.nombre} ${datosCliente.apellidos}<br>
-      ${datosCliente.direccion}, ${datosCliente.colonia}<br>
-      ${datosCliente.ciudad}, ${datosCliente.estado}, CP ${datosCliente.cp}<br>
-      ${datosCliente.email}
+      ${c.nombre} ${c.apellidos}<br>
+      ${c.direccion}, ${c.colonia}<br>
+      ${c.ciudad}, ${c.estado}, CP ${c.cp}<br>
+      ${c.email}
     </div>
-    ${carrito.map(c => `
-      <div class="cart-item">
-        <div class="cart-item-body">
-          <div class="cart-item-name">${c.nombre} ×${c.qty}</div>
-        </div>
-        <span class="cart-item-price">$${c.precio * c.qty}</span>
+    ${carrito.map(x=>`<div class="cart-item">
+      <div class="cart-item-body">
+        <div class="cart-item-name">${x.nombre} ×${x.qty}</div>
       </div>
-    `).join('')}
-  `;
+      <span class="cart-item-price">$${x.promo?x.precio:x.precio*x.qty}</span>
+    </div>`).join('')}`;
 
-  footerEl.innerHTML = `
-    <div class="cart-line"><span>Subtotal</span><span>$${desglose.subtotal}</span></div>
-    ${desglose.descuentoPromo > 0 ? `<div class="cart-line verde"><span>Descuento promo</span><span>-$${desglose.descuentoPromo}</span></div>` : ''}
-    ${desglose.descuentoCupon > 0 ? `<div class="cart-line verde"><span>Cupón</span><span>-$${desglose.descuentoCupon}</span></div>` : ''}
-    <div class="cart-line"><span>Envío</span><span>${desglose.envioGratis ? 'Gratis' : '$' + desglose.costoEnvio}</span></div>
-    <div class="cart-total-row"><span>Total</span><span>$${desglose.total}</span></div>
+  document.getElementById('cart-footer').innerHTML = `
+    <div class="cart-line"><span>Subtotal</span><span>$${dg.subtotal}</span></div>
+    ${dg.descPromo>0?`<div class="cart-line verde"><span>Promo</span><span>-$${dg.descPromo}</span></div>`:''}
+    ${dg.descCupon>0?`<div class="cart-line verde"><span>Cupón</span><span>-$${dg.descCupon}</span></div>`:''}
+    <div class="cart-line"><span>Envío</span><span>${dg.envioGratis?'Gratis':'$'+dg.costoEnvio}</span></div>
+    <div class="cart-total-row"><span>Total</span><span>$${dg.total}</span></div>
     <div id="paypal-button-container"></div>
-    <button class="btn-simulado" onclick="procesarCompraSimulada()">🧪 Compra simulada (modo prueba)</button>
+    <button class="btn-simulado" onclick="procesarCompraSimulada()">🧪 Compra simulada (prueba)</button>
     <button class="btn-volver" onclick="volverADatos()">← Volver a mis datos</button>
-    <div class="checkout-note">Pago seguro procesado por PayPal. Tus datos de tarjeta nunca pasan por nuestros servidores.</div>
-  `;
+    <div class="checkout-note">Pago seguro con PayPal. Tus datos de tarjeta nunca pasan por nuestros servidores.</div>`;
 
-  renderBotonPayPal(desglose.total);
+  renderBotonPayPal(dg.total);
 }
 
-function volverADatos() { pasoCheckout = 'datos'; renderCarrito(); }
+function volverADatos() { pasoCheckout='datos'; renderCarrito(); }
 window.volverADatos = volverADatos;
 
-// ─────────────────────────────────────────────────────────
-//  PAYPAL CHECKOUT
-// ─────────────────────────────────────────────────────────
+// ── PAYPAL ───────────────────────────────────────────────
 function renderBotonPayPal(total) {
   const container = document.getElementById('paypal-button-container');
   if (!container) return;
   container.innerHTML = '';
-
   if (typeof paypal === 'undefined') {
-    container.innerHTML = '<div style="font-size:12px;color:#A32D2D;text-align:center;padding:12px">PayPal no se pudo cargar. Verifica tu conexión o usa la compra simulada.</div>';
+    container.innerHTML = '<div style="font-size:12px;color:#A32D2D;text-align:center;padding:10px">PayPal no cargó. Usa la compra simulada.</div>';
     return;
   }
-
   try {
     paypal.Buttons({
-      style: { layout: 'vertical', color: 'black', shape: 'rect', label: 'pay' },
-      createOrder: function(data, actions) {
-        return actions.order.create({
-          purchase_units: [{
-            amount: { value: total.toString(), currency_code: 'MXN' },
-            description: 'Doña Metiche — ' + carrito.map(c => c.nombre + ' x' + c.qty).join(', ')
-          }]
-        });
-      },
-      onApprove: function(data, actions) {
-        return actions.order.capture().then(async function(details) {
-          await finalizarCompra({ metodo: 'paypal', paypalOrderId: details.id, paypalPayer: details.payer && details.payer.email_address });
-        });
-      },
-      onError: function(err) {
-        console.error('Error PayPal:', err);
-        toastTienda('Hubo un problema con PayPal. Puedes usar la compra simulada para probar.');
-      }
+      style:{ layout:'vertical', color:'black', shape:'rect', label:'pay' },
+      createOrder:(data,actions) => actions.order.create({
+        purchase_units:[{ amount:{value:total.toString(),currency_code:'MXN'},
+          description:'Doña Metiche — '+carrito.map(c=>c.nombre+' x'+c.qty).join(', ') }]
+      }),
+      onApprove:(data,actions) => actions.order.capture().then(async details => {
+        await finalizarCompra({ metodo:'paypal', paypalOrderId:details.id, paypalPayer:details.payer?.email_address });
+      }),
+      onError: err => { console.error(err); toastTienda('Error con PayPal. Usa la compra simulada.'); }
     }).render('#paypal-button-container');
-  } catch (err) {
-    console.error('Error renderizando botón PayPal:', err);
-    container.innerHTML = '<div style="font-size:12px;color:#A32D2D;text-align:center;padding:12px">Error cargando PayPal. Usa la compra simulada mientras lo revisamos.</div>';
+  } catch(e) {
+    container.innerHTML = '<div style="font-size:12px;color:#A32D2D;text-align:center;padding:10px">Error cargando PayPal.</div>';
   }
 }
 
-// ─────────────────────────────────────────────────────────
-//  COMPRA SIMULADA (modo prueba)
-// ─────────────────────────────────────────────────────────
 async function procesarCompraSimulada() {
-  await finalizarCompra({ metodo: 'simulado', paypalOrderId: 'SIMULADO-' + Date.now(), paypalPayer: datosCliente.email });
+  await finalizarCompra({ metodo:'simulado', paypalOrderId:'SIM-'+Date.now(), paypalPayer:datosCliente.email });
 }
 window.procesarCompraSimulada = procesarCompraSimulada;
 
-// ─────────────────────────────────────────────────────────
-//  FINALIZAR COMPRA — registrar en Firebase + descontar inventario + ticket
-// ─────────────────────────────────────────────────────────
+// ── FINALIZAR COMPRA ─────────────────────────────────────
 async function finalizarCompra(infoPago) {
   try {
-    const desglose = calcularDesglose();
+    const dg = calcularDesglose();
     const { getDatabase, ref, push, set, get } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
     const db = getDatabase();
 
-    const lineas = carrito.map(c => ({
-      tipo: 'normal', nombre: c.nombre, receta: c.receta, ml: c.ml,
-      qty: c.qty, precioUnit: c.precio, subtotal: c.precio * c.qty
-    }));
+    const lineas = carrito.map(c => c.promo
+      ? { tipo:'promo', nombre:c.nombre, desglose:c.desglose, ml:c.ml, qty:c.qty, precioPromo:c.precio, lineas:c.lineas }
+      : { tipo:'normal', nombre:c.nombre, receta:c.receta, ml:c.ml, qty:c.qty, precioUnit:c.precio, subtotal:c.precio*c.qty }
+    );
 
     const entry = {
-      tipo: 'venta',
-      canal: 'tienda-online',
-      lineas,
-      subtotal: desglose.subtotal,
-      descPromo: desglose.descuentoPromo,
-      descMayoreoVal: desglose.descuentoCupon,
-      cupon: cuponAplicado || null,
-      costoEnvio: desglose.costoEnvio,
-      envioGratis: desglose.envioGratis,
-      total: desglose.total,
-      pago: infoPago.metodo,
-      cambio: 0,
-      paypalOrderId: infoPago.paypalOrderId || null,
-      paypalPayer: infoPago.paypalPayer || null,
-      cliente: datosCliente,
-      fecha: new Date().toISOString()
+      tipo:'venta', canal:'tienda-online', lineas,
+      subtotal:dg.subtotal, descPromo:dg.descPromo, descCupon:dg.descCupon,
+      cupon:cuponAplicado||null, costoEnvio:dg.costoEnvio, envioGratis:dg.envioGratis,
+      total:dg.total, pago:infoPago.metodo,
+      paypalOrderId:infoPago.paypalOrderId||null,
+      paypalPayer:infoPago.paypalPayer||null,
+      cliente:datosCliente, fecha:new Date().toISOString()
     };
 
-    await push(ref(db, 'historial'), entry);
+    await push(ref(db,'historial'), entry);
 
-    // Guardar/actualizar cliente en base de clientes
-    const clienteKey = datosCliente.email.replace(/[.#$[\]]/g, '_');
-    await set(ref(db, 'clientes/' + clienteKey), {
-      nombre: datosCliente.nombre,
-      apellidos: datosCliente.apellidos,
-      email: datosCliente.email,
-      telefono: datosCliente.telefono || '',
-      direccion: datosCliente.direccion,
-      colonia: datosCliente.colonia,
-      cp: datosCliente.cp,
-      ciudad: datosCliente.ciudad,
-      estado: datosCliente.estado,
-      ultimaCompra: new Date().toISOString(),
-      totalCompras: (await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js")
-        .then(m => m.get(m.ref(db, 'clientes/' + clienteKey + '/totalCompras')))
-        .then(s => (s.val() || 0) + 1).catch(() => 1))
-    });
-
+    // Descontar inventario
     for (const c of carrito) {
-      const invRef = ref(db, 'inventario/' + c.id);
-      const snap = await get(invRef);
-      const actual = snap.val() || 0;
-      await set(invRef, Math.max(0, actual - c.qty));
+      if (c.promo && c.lineas) {
+        for (const l of c.lineas) {
+          const s = await get(ref(db,'inventario/'+l.id)).then(s=>s.val()||0);
+          await set(ref(db,'inventario/'+l.id), Math.max(0, s-l.qty*c.qty));
+        }
+      } else if (!c.promo) {
+        const s = await get(ref(db,'inventario/'+c.id)).then(s=>s.val()||0);
+        await set(ref(db,'inventario/'+c.id), Math.max(0, s-c.qty));
+      }
     }
 
-    await enviarCorreoNuevoPedido(entry);
+    // Guardar cliente
+    const cKey = datosCliente.email.replace(/[.#$[\]]/g,'_');
+    const prevSnap = await get(ref(db,'clientes/'+cKey));
+    const prev = prevSnap.val()||{};
+    await set(ref(db,'clientes/'+cKey), {
+      nombre:datosCliente.nombre, apellidos:datosCliente.apellidos,
+      email:datosCliente.email, telefono:datosCliente.telefono||'',
+      direccion:datosCliente.direccion, colonia:datosCliente.colonia,
+      cp:datosCliente.cp, ciudad:datosCliente.ciudad, estado:datosCliente.estado,
+      ultimaCompra:new Date().toISOString(),
+      totalCompras:(prev.totalCompras||0)+1
+    });
 
+    await enviarCorreoConfirmacion(entry);
     mostrarTicket(entry);
-
-    carrito = [];
-    cuponAplicado = null;
-    pasoCheckout = 'carrito';
-    renderCarrito();
-    cerrarCarrito();
-  } catch (err) {
-    console.error('Error finalizando compra:', err);
-    toastTienda('Hubo un error procesando tu compra. Contáctanos directamente.');
+    carrito=[]; cuponAplicado=null; pasoCheckout='carrito';
+    renderCarrito(); cerrarCarrito();
+  } catch(err) {
+    console.error(err);
+    toastTienda('Error procesando la compra. Contáctanos directamente.');
   }
 }
 
-// ─────────────────────────────────────────────────────────
-//  TICKET DE COMPRA
-// ─────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────
-//  CORREO DE CONFIRMACIÓN AL CREAR EL PEDIDO
-// ─────────────────────────────────────────────────────────
-async function enviarCorreoNuevoPedido(pedido) {
-  if (!window.emailjs) { console.warn('EmailJS no cargó todavía'); return; }
+// ── CORREO DE CONFIRMACIÓN ───────────────────────────────
+async function enviarCorreoConfirmacion(pedido) {
+  if (!window.emailjs) return;
   const cfg = window._EMAILJS_CONFIG;
-  if (!cfg || cfg.serviceId === 'TU_SERVICE_ID') { console.warn('EmailJS no configurado'); return; }
+  if (!cfg || cfg.serviceId==='TU_SERVICE_ID') return;
   const c = pedido.cliente;
+  const pedidoId = (pedido.paypalOrderId||'').slice(-8);
   const lineasHtml = pedido.lineas.map(l =>
-    `<tr><td style="padding:8px 0;border-bottom:1px solid #f0ede5">${l.nombre}</td><td style="padding:8px 0;border-bottom:1px solid #f0ede5;text-align:center">×${l.qty}</td><td style="padding:8px 0;border-bottom:1px solid #f0ede5;text-align:right">$${l.subtotal}</td></tr>`
+    `<tr><td style="padding:7px 0;border-bottom:1px solid #f0ede5">${l.nombre}</td><td style="text-align:center">×${l.qty}</td><td style="text-align:right">$${l.tipo==='promo'?l.precioPromo:l.subtotal}</td></tr>`
   ).join('');
-  const desglose = calcularDesglose();
-  const fecha = new Date(pedido.fecha).toLocaleDateString('es-MX', {day:'2-digit',month:'long',year:'numeric'});
-  const pedidoId = (pedido.paypalOrderId || '').slice(-8) || 'N/A';
-
-  const ticketHtml = `
-<div style="font-family:'Segoe UI',Arial,sans-serif;max-width:520px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e8e3dc">
-  <div style="background:#0A0A0A;padding:28px 32px;text-align:center">
-    <div style="color:#D4621A;font-size:11px;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px">Confirmación de pedido</div>
-    <div style="color:#FAFAF8;font-size:22px;font-weight:600">Doña Metiche</div>
-    <div style="color:rgba(250,250,248,0.6);font-size:12px;margin-top:4px">${fecha} · Pedido #${pedidoId}</div>
-  </div>
-  <div style="padding:28px 32px">
-    <p style="font-size:15px;color:#1C1C1A;margin-bottom:20px">Hola <strong>${c.nombre}</strong>, recibimos tu pedido. Aquí está tu resumen:</p>
-    <table style="width:100%;border-collapse:collapse;margin-bottom:20px">
-      <thead><tr>
-        <th style="text-align:left;font-size:11px;color:#6B6862;text-transform:uppercase;padding-bottom:8px;border-bottom:2px solid #e8e3dc">Producto</th>
-        <th style="text-align:center;font-size:11px;color:#6B6862;text-transform:uppercase;padding-bottom:8px;border-bottom:2px solid #e8e3dc">Cant.</th>
-        <th style="text-align:right;font-size:11px;color:#6B6862;text-transform:uppercase;padding-bottom:8px;border-bottom:2px solid #e8e3dc">Precio</th>
-      </tr></thead>
-      <tbody>${lineasHtml}</tbody>
-    </table>
-    ${desglose.descuentoPromo > 0 ? `<div style="display:flex;justify-content:space-between;font-size:13px;color:#27500A;margin-bottom:6px"><span>Descuento promo</span><span>-$${desglose.descuentoPromo}</span></div>` : ''}
-    ${desglose.descuentoCupon > 0 ? `<div style="display:flex;justify-content:space-between;font-size:13px;color:#27500A;margin-bottom:6px"><span>Cupón</span><span>-$${desglose.descuentoCupon}</span></div>` : ''}
-    <div style="display:flex;justify-content:space-between;font-size:13px;color:#6B6862;margin-bottom:6px"><span>Envío</span><span>${desglose.envioGratis ? 'Gratis' : '$'+desglose.costoEnvio}</span></div>
-    <div style="display:flex;justify-content:space-between;font-size:20px;font-weight:700;color:#0A0A0A;border-top:2px solid #0A0A0A;padding-top:14px;margin-top:10px"><span>Total</span><span>$${pedido.total}</span></div>
-    <div style="background:#F3EFE7;border-radius:6px;padding:16px;margin-top:24px">
-      <div style="font-size:11px;text-transform:uppercase;color:#6B6862;margin-bottom:8px;font-weight:600">Dirección de envío</div>
-      <div style="font-size:13px;color:#1C1C1A;line-height:1.7">${c.nombre} ${c.apellidos}<br>${c.direccion}, ${c.colonia}<br>${c.ciudad}, ${c.estado}, CP ${c.cp}<br>${c.email}${c.telefono ? '<br>'+c.telefono : ''}</div>
+  const ticket = `<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;border:1px solid #e8e3dc;border-radius:8px;overflow:hidden">
+    <div style="background:#0A0A0A;padding:24px;text-align:center">
+      <div style="color:#D4621A;font-size:11px;letter-spacing:3px;text-transform:uppercase;margin-bottom:6px">Confirmación de pedido</div>
+      <div style="color:#fff;font-size:20px;font-weight:600">Doña Metiche</div>
+      <div style="color:rgba(255,255,255,.5);font-size:12px;margin-top:4px">Pedido #${pedidoId}</div>
     </div>
-    <p style="font-size:12px;color:#6B6862;margin-top:24px;text-align:center">Recibirás una notificación cuando tu pedido sea enviado.<br>¿Dudas? Contáctanos por WhatsApp.</p>
-  </div>
-  <div style="background:#1C1C1A;padding:16px 32px;text-align:center;font-size:11px;color:rgba(250,250,248,0.4)">
-    Salsa Doña Metiche · Artesanal con amor 🌶️
-  </div>
-</div>`;
-
+    <div style="padding:24px">
+      <p style="margin-bottom:16px">Hola <strong>${c.nombre}</strong>, recibimos tu pedido.</p>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+        <thead><tr><th style="text-align:left;font-size:11px;color:#6B6862;text-transform:uppercase;padding-bottom:7px;border-bottom:2px solid #e8e3dc">Producto</th><th style="text-align:center;font-size:11px;color:#6B6862;text-transform:uppercase;padding-bottom:7px;border-bottom:2px solid #e8e3dc">Cant.</th><th style="text-align:right;font-size:11px;color:#6B6862;text-transform:uppercase;padding-bottom:7px;border-bottom:2px solid #e8e3dc">Precio</th></tr></thead>
+        <tbody>${lineasHtml}</tbody>
+      </table>
+      ${pedido.descPromo>0?`<div style="display:flex;justify-content:space-between;font-size:13px;color:#27500A;margin-bottom:5px"><span>Ahorro promo</span><span>-$${pedido.descPromo}</span></div>`:''}
+      ${pedido.descCupon>0?`<div style="display:flex;justify-content:space-between;font-size:13px;color:#27500A;margin-bottom:5px"><span>Cupón</span><span>-$${pedido.descCupon}</span></div>`:''}
+      <div style="display:flex;justify-content:space-between;font-size:13px;color:#6B6862;margin-bottom:5px"><span>Envío</span><span>${pedido.envioGratis?'Gratis':'$'+pedido.costoEnvio}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:19px;font-weight:700;border-top:2px solid #0A0A0A;padding-top:12px;margin-top:8px"><span>Total</span><span>$${pedido.total}</span></div>
+      <div style="background:#F3EFE7;border-radius:6px;padding:14px;margin-top:18px">
+        <div style="font-size:11px;text-transform:uppercase;color:#6B6862;margin-bottom:6px;font-weight:600">Dirección de entrega</div>
+        <div style="font-size:13px;line-height:1.7">${c.nombre} ${c.apellidos}<br>${c.direccion}, ${c.colonia}<br>${c.ciudad}, ${c.estado}, CP ${c.cp}</div>
+      </div>
+      <p style="font-size:12px;color:#6B6862;margin-top:18px;text-align:center">Recibirás notificación cuando tu pedido sea enviado.</p>
+    </div>
+    <div style="background:#1C1C1A;padding:14px;text-align:center;font-size:11px;color:rgba(255,255,255,.35)">Salsa Doña Metiche · Artesanal con amor 🌶️</div>
+  </div>`;
   try {
     await window.emailjs.send(cfg.serviceId, cfg.templateId, {
-      nombre: c.nombre,
-      pedido_id: pedidoId,
-      nuevo_estatus: '🟡 Pedido recibido',
-      guia: 'Aún no disponible',
-      paqueteria: 'Por confirmar',
-      productos: pedido.lineas.map(l => l.nombre + ' x' + l.qty).join(', '),
-      total: '$' + pedido.total,
-      to_email: c.email,
-      ticket_html: ticketHtml
+      nombre:c.nombre, pedido_id:pedidoId,
+      nuevo_estatus:'🟡 Pedido recibido',
+      guia:'Aún no disponible', paqueteria:'Por confirmar',
+      productos:pedido.lineas.map(l=>l.nombre+' x'+l.qty).join(', '),
+      total:'$'+pedido.total, to_email:c.email, ticket_html:ticket
     });
-  } catch (err) {
-    console.error('Error enviando correo de confirmación:', err);
-  }
+  } catch(e) { console.error('Error enviando correo:', e); }
 }
 
+// ── TICKET ───────────────────────────────────────────────
 function mostrarTicket(venta) {
   const d = new Date(venta.fecha);
-  const fecha = d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' + d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
-
-  const itemsHtml = venta.lineas.map(l => `<div class="ticket-row"><span>${l.nombre} ×${l.qty}</span><span>$${l.subtotal}</span></div>`).join('');
-
+  const fecha = d.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})+' '+d.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+  const pedidoId = (venta.paypalOrderId||'').slice(-8)||'N/A';
+  const c = venta.cliente;
+  const itemsHtml = venta.lineas.map(l =>
+    `<div class="ticket-row"><span>${l.nombre} ×${l.qty}</span><span>$${l.tipo==='promo'?l.precioPromo:l.subtotal}</span></div>`
+  ).join('');
   document.getElementById('ticket-modal-content').innerHTML = `
-    <div class="ticket-header-icon">✓</div>
-    <h2>¡Compra confirmada!</h2>
-    <p class="ticket-sub">${venta.pago === 'simulado' ? '🧪 Compra simulada (modo prueba)' : 'Gracias por tu pedido, ' + venta.cliente.nombre}</p>
+    <div class="ticket-icon">✓</div>
+    <h2>¡Pedido confirmado!</h2>
+    <p class="ticket-sub">${venta.pago==='simulado'?'🧪 Compra simulada':'Gracias, '+c.nombre}</p>
     <hr class="ticket-divider">
     ${itemsHtml}
     <hr class="ticket-divider">
-    <div class="ticket-row"><span>Subtotal</span><span>$${venta.subtotal}</span></div>
-    ${venta.descPromo > 0 ? `<div class="ticket-row"><span>Descuento promo</span><span>-$${venta.descPromo}</span></div>` : ''}
-    ${venta.descMayoreoVal > 0 ? `<div class="ticket-row"><span>Cupón ${venta.cupon || ''}</span><span>-$${venta.descMayoreoVal}</span></div>` : ''}
-    <div class="ticket-row"><span>Envío</span><span>${venta.envioGratis ? 'Gratis' : '$' + venta.costoEnvio}</span></div>
+    ${venta.descPromo>0?`<div class="ticket-row"><span>Promo</span><span>-$${venta.descPromo}</span></div>`:''}
+    ${venta.descCupon>0?`<div class="ticket-row"><span>Cupón</span><span>-$${venta.descCupon}</span></div>`:''}
+    <div class="ticket-row"><span>Envío</span><span>${venta.envioGratis?'Gratis':'$'+venta.costoEnvio}</span></div>
     <div class="ticket-row bold"><span>Total pagado</span><span>$${venta.total}</span></div>
     <hr class="ticket-divider">
-    <div class="ticket-row"><span>Enviar a</span></div>
-    <p style="font-size:12.5px;color:var(--gris);line-height:1.6;margin-top:4px">
-      ${venta.cliente.direccion}, ${venta.cliente.colonia}<br>
-      ${venta.cliente.ciudad}, ${venta.cliente.estado}, CP ${venta.cliente.cp}
+    <p style="font-size:12.5px;color:var(--gris);line-height:1.7;margin-bottom:4px">
+      ${c.direccion}, ${c.colonia}<br>${c.ciudad}, ${c.estado}, CP ${c.cp}
     </p>
-    <p style="font-size:11px;color:var(--gris);margin-top:14px;text-align:center">${fecha} · Pedido #${(venta.paypalOrderId || '').slice(-8)}</p>
-    <button class="btn-cerrar-ticket" onclick="cerrarTicket()">Cerrar</button>
-  `;
+    <p style="font-size:11px;color:var(--gris);text-align:center;margin-top:10px">${fecha} · Pedido #${pedidoId}</p>
+    <button class="btn-cerrar-ticket" onclick="cerrarTicket()">Cerrar</button>`;
   document.getElementById('ticket-overlay').classList.add('open');
 }
 
 function cerrarTicket() { document.getElementById('ticket-overlay').classList.remove('open'); }
 window.cerrarTicket = cerrarTicket;
 
-// ─────────────────────────────────────────────────────────
-//  CARRITO DRAWER OPEN/CLOSE
-// ─────────────────────────────────────────────────────────
+// ── DRAWER ───────────────────────────────────────────────
 function abrirCarrito() {
-  pasoCheckout = 'carrito';
+  pasoCheckout='carrito';
   document.getElementById('cart-overlay').classList.add('open');
-  document.body.style.overflow = 'hidden';
+  document.body.style.overflow='hidden';
   renderCarrito();
 }
 window.abrirCarrito = abrirCarrito;
 
 function cerrarCarrito() {
   document.getElementById('cart-overlay').classList.remove('open');
-  document.body.style.overflow = '';
+  document.body.style.overflow='';
 }
 window.cerrarCarrito = cerrarCarrito;
 
-function cerrarCarritoOverlay(e) {
-  if (e.target.id === 'cart-overlay') cerrarCarrito();
-}
+function cerrarCarritoOverlay(e) { if(e.target.id==='cart-overlay') cerrarCarrito(); }
 window.cerrarCarritoOverlay = cerrarCarritoOverlay;
 
-// ─────────────────────────────────────────────────────────
-//  QUIENES SOMOS
-// ─────────────────────────────────────────────────────────
-function renderQuienesSomos() {
-  const qs = window._app ? window._app.quienesSomos : null;
-  if (!qs) return;
-  const elTitulo = document.getElementById('qs-titulo');
-  const elP1 = document.getElementById('qs-p1');
-  const elP2 = document.getElementById('qs-p2');
-  const elP3 = document.getElementById('qs-p3');
-  if (elTitulo) elTitulo.textContent = qs.titulo || '';
-  if (elP1) elP1.textContent = qs.parrafo1 || '';
-  if (elP2) elP2.textContent = qs.parrafo2 || '';
-  if (elP3) elP3.textContent = qs.parrafo3 || '';
-}
-window.renderQuienesSomos = renderQuienesSomos;
-
-// ─────────────────────────────────────────────────────────
-//  ESC PARA CERRAR
-// ─────────────────────────────────────────────────────────
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { cerrarModalProducto(); cerrarCarrito(); cerrarTicket(); }
+// ── ESC ──────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key==='Escape') { cerrarModalProducto(); cerrarCarrito(); cerrarTicket(); }
 });
