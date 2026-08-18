@@ -177,7 +177,11 @@ body{font-family:var(--sans);background:var(--crema);color:var(--carbon);min-hei
     <div id="cupones-container"></div>
     <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;align-items:center">
       <input type="text" id="nuevo-cupon-codigo" placeholder="CÓDIGO" style="flex:1;min-width:120px;border:1px solid var(--gris-claro);border-radius:5px;padding:10px;text-transform:uppercase;font-family:monospace;font-weight:700"/>
-      <input type="number" id="nuevo-cupon-pct" placeholder="% desc." min="0" max="100" style="width:90px;border:1px solid var(--gris-claro);border-radius:5px;padding:10px"/>
+      <select id="nuevo-cupon-tipo" style="border:1px solid var(--gris-claro);border-radius:5px;padding:10px;font-size:13px;background:#fff">
+        <option value="pct">% Porcentaje</option>
+        <option value="monto">$ Monto fijo</option>
+      </select>
+      <input type="number" id="nuevo-cupon-valor" placeholder="Valor" min="0" style="width:90px;border:1px solid var(--gris-claro);border-radius:5px;padding:10px"/>
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;white-space:nowrap"><input type="checkbox" id="nuevo-cupon-envio"/> Envío gratis</label>
       <button class="btn-add" onclick="agregarCupon()">+ Agregar</button>
     </div>
@@ -229,64 +233,86 @@ body{font-family:var(--sans);background:var(--crema);color:var(--carbon);min-hei
 <!-- DISEÑO -->
 <div id="panel-diseno" class="admin-panel">
   <div class="admin-section">
-    <h2>Tipografía</h2>
-    <p class="sub">Elige la fuente de los títulos de la tienda.</p>
-    <div class="row3" id="fuentes-grid"></div>
+    <h2>Fuentes</h2>
+    <p class="sub">Elige una fuente para cada tipo de texto en la tienda.</p>
+    <div class="row2" style="margin-bottom:18px">
+      <div class="field"><label>Fuente de títulos</label><select class="sel-fuente" id="fuente-titulos"></select></div>
+      <div class="field"><label>Fuente de cuerpo / párrafos</label><select class="sel-fuente" id="fuente-cuerpo"></select></div>
+      <div class="field"><label>Fuente de precios</label><select class="sel-fuente" id="fuente-precios"></select></div>
+      <div class="field"><label>Fuente de botones</label><select class="sel-fuente" id="fuente-botones"></select></div>
+    </div>
+    <div id="fuente-preview" style="background:var(--crema);border-radius:8px;padding:20px;margin-bottom:16px">
+      <div id="prev-titulo" style="font-size:24px;margin-bottom:6px">Título de ejemplo</div>
+      <div id="prev-cuerpo" style="font-size:14px;color:var(--gris);margin-bottom:8px">Texto de cuerpo, párrafos y descripciones de la tienda.</div>
+      <div id="prev-precio" style="font-size:20px;color:var(--naranja);margin-bottom:8px">$150 MXN</div>
+      <button id="prev-boton" style="padding:10px 20px;background:var(--negro);color:#fff;border:none;border-radius:3px;font-size:13px">Agregar al carrito</button>
+    </div>
   </div>
 
   <div class="admin-section">
-    <h2>Colores</h2>
-    <p class="sub">Personaliza los colores principales de la tienda.</p>
-    <div class="row2">
-      <div class="field">
-        <label>Color de fondo principal</label>
-        <div style="display:flex;align-items:center;gap:10px">
-          <input type="color" id="color-fondo" value="#FAFAF8" style="width:50px;height:42px;padding:2px;border:1px solid var(--gris-claro);border-radius:5px;cursor:pointer"/>
-          <input type="text" id="color-fondo-hex" placeholder="#FAFAF8" style="flex:1;border:1px solid var(--gris-claro);border-radius:5px;padding:10px;font-family:monospace;font-size:13px"/>
-        </div>
-      </div>
-      <div class="field">
-        <label>Color de texto principal</label>
-        <div style="display:flex;align-items:center;gap:10px">
-          <input type="color" id="color-texto" value="#1C1C1A" style="width:50px;height:42px;padding:2px;border:1px solid var(--gris-claro);border-radius:5px;cursor:pointer"/>
-          <input type="text" id="color-texto-hex" placeholder="#1C1C1A" style="flex:1;border:1px solid var(--gris-claro);border-radius:5px;padding:10px;font-family:monospace;font-size:13px"/>
-        </div>
-      </div>
-      <div class="field">
-        <label>Color de acento (botones, precios)</label>
-        <div style="display:flex;align-items:center;gap:10px">
-          <input type="color" id="color-acento" value="#D4621A" style="width:50px;height:42px;padding:2px;border:1px solid var(--gris-claro);border-radius:5px;cursor:pointer"/>
-          <input type="text" id="color-acento-hex" placeholder="#D4621A" style="flex:1;border:1px solid var(--gris-claro);border-radius:5px;padding:10px;font-family:monospace;font-size:13px"/>
-        </div>
-      </div>
-      <div class="field">
-        <label>Color de fondo negro / header</label>
-        <div style="display:flex;align-items:center;gap:10px">
-          <input type="color" id="color-negro" value="#0A0A0A" style="width:50px;height:42px;padding:2px;border:1px solid var(--gris-claro);border-radius:5px;cursor:pointer"/>
-          <input type="text" id="color-negro-hex" placeholder="#0A0A0A" style="flex:1;border:1px solid var(--gris-claro);border-radius:5px;padding:10px;font-family:monospace;font-size:13px"/>
-        </div>
-      </div>
-    </div>
+    <h2>Colores globales</h2>
+    <p class="sub">Colores base de la tienda.</p>
+    <div class="row2" id="colores-globales-grid"></div>
+  </div>
+
+  <div class="admin-section">
+    <h2>Color de fondo por sección</h2>
+    <p class="sub">Personaliza el fondo de cada sección independientemente.</p>
+    <div class="row2" id="colores-secciones-grid"></div>
     <button class="btn-save" onclick="guardarDiseno()">Guardar diseño</button>
   </div>
 </div>
 
-<!-- HISTORIA -->
+<!-- HISTORIA / TEXTOS -->
 <div id="panel-historia" class="admin-panel">
   <div class="admin-section">
+    <h2>Textos del inicio (Hero)</h2>
+    <p class="sub">Sección principal que ven los visitantes al entrar.</p>
+    <div class="field"><label>Eyebrow (texto pequeño arriba)</label><input type="text" id="txt-hero-eyebrow" placeholder="Lote artesanal · Hecho a mano"/></div>
+    <div class="field"><label>Título principal</label><input type="text" id="txt-hero-titulo" placeholder="El picor que se sirve como joya."/></div>
+    <div class="field"><label>Párrafo</label><textarea id="txt-hero-parrafo" rows="2"></textarea></div>
+    <button class="btn-save" onclick="guardarTextosHero()">Guardar hero</button>
+  </div>
+
+  <div class="admin-section">
+    <h2>Textos de la colección</h2>
+    <div class="field"><label>Título de la sección</label><input type="text" id="txt-col-titulo" placeholder="Cada receta, su propio carácter"/></div>
+    <div class="field"><label>Subtítulo</label><input type="text" id="txt-col-subtitulo" placeholder="Elige tu receta, luego el tamaño..."/></div>
+    <button class="btn-save" onclick="guardarTextosColeccion()">Guardar colección</button>
+  </div>
+
+  <div class="admin-section">
     <h2>Descripciones de recetas</h2>
-    <p class="sub">Estos textos aparecen en la ficha de cada producto en la tienda.</p>
+    <p class="sub">Tagline y descripción de cada receta en el modal del producto.</p>
     <div id="descripciones-container"></div>
   </div>
 
   <div class="admin-section">
     <h2>Quiénes somos</h2>
-    <p class="sub">Texto de la sección "Nuestra historia" en la tienda.</p>
     <div class="field"><label>Título</label><input type="text" id="qs-titulo-input"/></div>
     <div class="field"><label>Párrafo 1</label><textarea id="qs-p1-input"></textarea></div>
     <div class="field"><label>Párrafo 2</label><textarea id="qs-p2-input"></textarea></div>
     <div class="field"><label>Párrafo 3</label><textarea id="qs-p3-input"></textarea></div>
-    <button class="btn-save" onclick="guardarQuienesSomos()">Guardar</button>
+    <button class="btn-save" onclick="guardarQuienesSomos()">Guardar quiénes somos</button>
+  </div>
+
+  <div class="admin-section">
+    <h2>Pie de página (Footer)</h2>
+    <div class="field"><label>Tagline del footer</label><input type="text" id="txt-footer-tagline" placeholder="Salsas artesanales en lotes pequeños."/></div>
+    <button class="btn-save" onclick="guardarTextosFooter()">Guardar footer</button>
+  </div>
+
+  <div class="admin-section">
+    <h2>Redes sociales y contacto</h2>
+    <p class="sub">Edita los hipervínculos del footer. Escribe solo el usuario (sin @) o la URL completa según corresponda.</p>
+    <div class="row2">
+      <div class="field"><label>WhatsApp (número con código de país)</label><input type="text" id="enlace-whatsapp" placeholder="521234567890"/></div>
+      <div class="field"><label>Instagram (usuario)</label><input type="text" id="enlace-instagram" placeholder="donaMetiche"/></div>
+      <div class="field"><label>Facebook (URL completa)</label><input type="text" id="enlace-facebook" placeholder="https://facebook.com/donaMetiche"/></div>
+      <div class="field"><label>TikTok (usuario)</label><input type="text" id="enlace-tiktok" placeholder="donaMetiche"/></div>
+      <div class="field"><label>Email</label><input type="email" id="enlace-email" placeholder="ventas@donaMetiche.com"/></div>
+    </div>
+    <button class="btn-save" onclick="guardarEnlaces()">Guardar enlaces</button>
   </div>
 </div>
 
@@ -332,7 +358,7 @@ function adminInit() {
   cargarQuienesSomos();
   cargarImagenes();
   cargarClientes();
-  initColorSync();
+  cargarTextosPagina();
 }
 window.adminInit = adminInit;
 
@@ -517,10 +543,11 @@ function renderCupones() {
   if (!keys.length) { container.innerHTML = '<p style="font-size:13px;color:var(--gris);margin-bottom:8px">Sin cupones todavía.</p>'; return; }
   container.innerHTML = keys.map(codigo => {
     const c = cuponesData[codigo];
-    const pct = typeof c === 'object' ? (c.pct || 0) : (c || 0);
+    const tipo = typeof c === 'object' ? (c.tipo || 'pct') : 'pct';
+    const valor = typeof c === 'object' ? (c.valor || c.pct || 0) : (c || 0);
     const envioGratis = typeof c === 'object' ? !!c.envioGratis : false;
     const partes = [];
-    if (pct > 0) partes.push(pct + '% descuento');
+    if (valor > 0) partes.push(tipo === 'monto' ? '$' + valor + ' de descuento' : valor + '% descuento');
     if (envioGratis) partes.push('envío gratis');
     return `<div class="cupon-row">
       <span class="cupon-code">${codigo}</span>
@@ -532,14 +559,15 @@ function renderCupones() {
 
 async function agregarCupon() {
   const codigo = document.getElementById('nuevo-cupon-codigo').value.trim().toUpperCase();
-  const pct = parseFloat(document.getElementById('nuevo-cupon-pct').value) || 0;
+  const tipo = document.getElementById('nuevo-cupon-tipo').value;
+  const valor = parseFloat(document.getElementById('nuevo-cupon-valor').value) || 0;
   const envioGratis = document.getElementById('nuevo-cupon-envio').checked;
   if (!codigo) { toastAdmin('Ingresa un código'); return; }
-  if (pct === 0 && !envioGratis) { toastAdmin('El cupón debe dar % o envío gratis'); return; }
+  if (valor === 0 && !envioGratis) { toastAdmin('El cupón debe dar descuento o envío gratis'); return; }
   const { ref, set } = window._dbRefs;
-  await set(ref(window._db, 'tienda/cupones/' + codigo), { pct, envioGratis });
+  await set(ref(window._db, 'tienda/cupones/' + codigo), { tipo, valor, envioGratis });
   document.getElementById('nuevo-cupon-codigo').value = '';
-  document.getElementById('nuevo-cupon-pct').value = '';
+  document.getElementById('nuevo-cupon-valor').value = '';
   document.getElementById('nuevo-cupon-envio').checked = false;
   toastAdmin('Cupón ' + codigo + ' creado ✓');
 }
@@ -693,68 +721,103 @@ async function quitarFoto(productoId, idx) {
 window.quitarFoto = quitarFoto;
 
 // ─── DISEÑO ───────────────────────────────────────────────
-const FUENTES = [
-  { key: 'Fraunces', nombre: 'Fraunces', preview: 'Doña Metiche', google: 'Fraunces:ital,opsz,wght@0,9..144,400;1,9..144,400' },
-  { key: 'Playfair Display', nombre: 'Playfair', preview: 'Doña Metiche', google: 'Playfair+Display:wght@400;600' },
-  { key: 'Cormorant Garamond', nombre: 'Cormorant', preview: 'Doña Metiche', google: 'Cormorant+Garamond:wght@400;600' },
-  { key: 'Libre Baskerville', nombre: 'Baskerville', preview: 'Doña Metiche', google: 'Libre+Baskerville:wght@400;700' },
-  { key: 'Josefin Sans', nombre: 'Josefin Sans', preview: 'DOÑA METICHE', google: 'Josefin+Sans:wght@400;600' },
-  { key: 'Montserrat', nombre: 'Montserrat', preview: 'Doña Metiche', google: 'Montserrat:wght@400;600' },
+const FUENTES_LIST = ['Fraunces','Playfair Display','Cormorant Garamond','Libre Baskerville','Josefin Sans','Montserrat','Inter','Lato','Poppins','Raleway'];
+
+const COLORES_GLOBALES = [
+  {id:'colorFondo',label:'Fondo principal',def:'#FAFAF8'},
+  {id:'colorTexto',label:'Texto principal',def:'#1C1C1A'},
+  {id:'colorAcento',label:'Acento (botones/precios)',def:'#D4621A'},
+  {id:'colorNegro',label:'Header / fondo oscuro',def:'#0A0A0A'},
+  {id:'colorTitulosTexto',label:'Color de títulos',def:'#1C1C1A'},
+  {id:'colorCuerpoTexto',label:'Color de cuerpo',def:'#6B6862'},
 ];
-let fuenteSeleccionada = 'Fraunces';
+const COLORES_SECCIONES = [
+  {id:'colorHeroBg',label:'Fondo Hero (inicio)',def:'#0A0A0A'},
+  {id:'colorSeccionBg',label:'Fondo Colección',def:'#FAFAF8'},
+  {id:'colorQsBg',label:'Fondo Quiénes somos',def:'#0A0A0A'},
+  {id:'colorFooterBg',label:'Fondo Footer',def:'#1C1C1A'},
+];
 
 function cargarDiseno() {
+  // Llenar selects de fuentes
+  ['fuente-titulos','fuente-cuerpo','fuente-precios','fuente-botones'].forEach(id => {
+    const sel = document.getElementById(id); if(!sel) return;
+    sel.innerHTML = FUENTES_LIST.map(f=>`<option value="${f}">${f}</option>`).join('');
+    sel.addEventListener('change', actualizarPreviewFuentes);
+  });
+  // Generar grids de colores
+  const gg = document.getElementById('colores-globales-grid');
+  if(gg) gg.innerHTML = COLORES_GLOBALES.map(c=>`
+    <div class="field"><label>${c.label}</label>
+      <div style="display:flex;align-items:center;gap:8px">
+        <input type="color" id="cp-${c.id}" value="${c.def}" style="width:46px;height:38px;padding:2px;border:1px solid var(--gris-claro);border-radius:5px;cursor:pointer" oninput="syncHex('${c.id}')"/>
+        <input type="text" id="hex-${c.id}" value="${c.def}" style="flex:1;border:1px solid var(--gris-claro);border-radius:5px;padding:9px;font-family:monospace;font-size:13px" oninput="syncPicker('${c.id}')"/>
+      </div>
+    </div>`).join('');
+  const gs = document.getElementById('colores-secciones-grid');
+  if(gs) gs.innerHTML = COLORES_SECCIONES.map(c=>`
+    <div class="field"><label>${c.label}</label>
+      <div style="display:flex;align-items:center;gap:8px">
+        <input type="color" id="cp-${c.id}" value="${c.def}" style="width:46px;height:38px;padding:2px;border:1px solid var(--gris-claro);border-radius:5px;cursor:pointer" oninput="syncHex('${c.id}')"/>
+        <input type="text" id="hex-${c.id}" value="${c.def}" style="flex:1;border:1px solid var(--gris-claro);border-radius:5px;padding:9px;font-family:monospace;font-size:13px" oninput="syncPicker('${c.id}')"/>
+      </div>
+    </div>`).join('');
+
   const { ref, onValue } = window._dbRefs;
   onValue(ref(window._db, 'tienda/diseno'), snap => {
     disenoData = snap.val() || {};
-    if (disenoData.fuente) fuenteSeleccionada = disenoData.fuente;
-    if (disenoData.colorFondo) { document.getElementById('color-fondo').value = disenoData.colorFondo; document.getElementById('color-fondo-hex').value = disenoData.colorFondo; }
-    if (disenoData.colorTexto) { document.getElementById('color-texto').value = disenoData.colorTexto; document.getElementById('color-texto-hex').value = disenoData.colorTexto; }
-    if (disenoData.colorAcento) { document.getElementById('color-acento').value = disenoData.colorAcento; document.getElementById('color-acento-hex').value = disenoData.colorAcento; }
-    if (disenoData.colorNegro) { document.getElementById('color-negro').value = disenoData.colorNegro; document.getElementById('color-negro-hex').value = disenoData.colorNegro; }
-    renderFuentesGrid();
+    // Fuentes
+    ['fuenteTitulos','fuenteCuerpo','fuentePrecios','fuenteBotones'].forEach(k=>{
+      const mapId={'fuenteTitulos':'fuente-titulos','fuenteCuerpo':'fuente-cuerpo','fuentePrecios':'fuente-precios','fuenteBotones':'fuente-botones'};
+      const el=document.getElementById(mapId[k]); if(el&&disenoData[k]) el.value=disenoData[k];
+    });
+    // Colores
+    [...COLORES_GLOBALES,...COLORES_SECCIONES].forEach(c=>{
+      if(disenoData[c.id]){
+        const p=document.getElementById('cp-'+c.id),h=document.getElementById('hex-'+c.id);
+        if(p)p.value=disenoData[c.id]; if(h)h.value=disenoData[c.id];
+      }
+    });
+    actualizarPreviewFuentes();
   });
 }
 
-function renderFuentesGrid() {
-  const grid = document.getElementById('fuentes-grid'); if (!grid) return;
-  grid.innerHTML = FUENTES.map(f => `
-    <div class="fuente-card ${f.key === fuenteSeleccionada ? 'active' : ''}" onclick="seleccionarFuente('${f.key}')">
-      <div class="preview" style="font-family:'${f.key}',serif">${f.preview}</div>
-      <div class="fname">${f.nombre}</div>
-    </div>
-  `).join('');
-}
+function syncHex(id){ const p=document.getElementById('cp-'+id),h=document.getElementById('hex-'+id); if(p&&h)h.value=p.value; }
+function syncPicker(id){ const p=document.getElementById('cp-'+id),h=document.getElementById('hex-'+id); if(p&&h&&/^#[0-9A-Fa-f]{6}$/.test(h.value))p.value=h.value; }
+window.syncHex=syncHex; window.syncPicker=syncPicker;
 
-function seleccionarFuente(key) {
-  fuenteSeleccionada = key;
-  renderFuentesGrid();
-  const fuente = FUENTES.find(f => f.key === key);
-  if (fuente) {
-    const link = document.getElementById('google-font-link');
-    link.href = 'https://fonts.googleapis.com/css2?family=' + fuente.google + '&display=swap';
-  }
-}
-window.seleccionarFuente = seleccionarFuente;
-
-function initColorSync() {
-  [['color-fondo','color-fondo-hex'],['color-texto','color-texto-hex'],['color-acento','color-acento-hex'],['color-negro','color-negro-hex']].forEach(([picker,hex]) => {
-    document.getElementById(picker).addEventListener('input', e => { document.getElementById(hex).value = e.target.value; });
-    document.getElementById(hex).addEventListener('input', e => { const v = e.target.value; if (/^#[0-9A-Fa-f]{6}$/.test(v)) document.getElementById(picker).value = v; });
+function actualizarPreviewFuentes(){
+  const ft=document.getElementById('fuente-titulos')?.value||'Fraunces';
+  const fc=document.getElementById('fuente-cuerpo')?.value||'Inter';
+  const fp=document.getElementById('fuente-precios')?.value||'Fraunces';
+  const fb=document.getElementById('fuente-botones')?.value||'Inter';
+  const pt=document.getElementById('prev-titulo'); if(pt)pt.style.fontFamily=ft+',serif';
+  const pc=document.getElementById('prev-cuerpo'); if(pc)pc.style.fontFamily=fc+',sans-serif';
+  const pp=document.getElementById('prev-precio'); if(pp)pp.style.fontFamily=fp+',serif';
+  const pb=document.getElementById('prev-boton'); if(pb)pb.style.fontFamily=fb+',sans-serif';
+  // cargar Google Fonts del preview
+  ['fuente-titulos','fuente-cuerpo','fuente-precios','fuente-botones'].forEach((selId,i)=>{
+    const val=document.getElementById(selId)?.value; if(!val)return;
+    const linkId='gf-preview-'+i; let lk=document.getElementById(linkId);
+    if(!lk){lk=document.createElement('link');lk.rel='stylesheet';lk.id=linkId;document.head.appendChild(lk);}
+    lk.href='https://fonts.googleapis.com/css2?family='+val.replace(/ /g,'+')+'&display=swap';
   });
 }
+window.actualizarPreviewFuentes=actualizarPreviewFuentes;
 
 async function guardarDiseno() {
   const { ref, set } = window._dbRefs;
   const data = {
-    fuente: fuenteSeleccionada,
-    colorFondo: document.getElementById('color-fondo').value,
-    colorTexto: document.getElementById('color-texto').value,
-    colorAcento: document.getElementById('color-acento').value,
-    colorNegro: document.getElementById('color-negro').value
+    fuenteTitulos: document.getElementById('fuente-titulos')?.value||'Fraunces',
+    fuenteCuerpo: document.getElementById('fuente-cuerpo')?.value||'Inter',
+    fuentePrecios: document.getElementById('fuente-precios')?.value||'Fraunces',
+    fuenteBotones: document.getElementById('fuente-botones')?.value||'Inter',
   };
+  [...COLORES_GLOBALES,...COLORES_SECCIONES].forEach(c=>{
+    const el=document.getElementById('hex-'+c.id); if(el)data[c.id]=el.value;
+  });
   await set(ref(window._db, 'tienda/diseno'), data);
-  toastAdmin('Diseño guardado ✓ — recarga la tienda para ver los cambios');
+  toastAdmin('Diseño guardado ✓');
 }
 window.guardarDiseno = guardarDiseno;
 
@@ -812,6 +875,78 @@ async function guardarQuienesSomos() {
   toastAdmin('Texto guardado ✓');
 }
 window.guardarQuienesSomos = guardarQuienesSomos;
+
+// ─── TEXTOS DE LA PÁGINA ─────────────────────────────────
+function cargarTextosPagina() {
+  const { ref, onValue } = window._dbRefs;
+  onValue(ref(window._db, 'tienda/textos'), snap => {
+    const d = snap.val() || {};
+    if(d['hero-eyebrow-txt']) document.getElementById('txt-hero-eyebrow').value = d['hero-eyebrow-txt'];
+    if(d['hero-titulo']) document.getElementById('txt-hero-titulo').value = d['hero-titulo'];
+    if(d['hero-parrafo']) document.getElementById('txt-hero-parrafo').value = d['hero-parrafo'];
+    if(d['coleccion-titulo']) document.getElementById('txt-col-titulo').value = d['coleccion-titulo'];
+    if(d['coleccion-subtitulo']) document.getElementById('txt-col-subtitulo').value = d['coleccion-subtitulo'];
+    if(d['footer-tagline']) document.getElementById('txt-footer-tagline').value = d['footer-tagline'];
+  });
+  onValue(ref(window._db, 'tienda/quienesSomos'), snap => {
+    const d = snap.val() || {};
+    if(d.titulo) document.getElementById('qs-titulo-input').value = d.titulo;
+    if(d.parrafo1) document.getElementById('qs-p1-input').value = d.parrafo1;
+    if(d.parrafo2) document.getElementById('qs-p2-input').value = d.parrafo2;
+    if(d.parrafo3) document.getElementById('qs-p3-input').value = d.parrafo3;
+  });
+  onValue(ref(window._db, 'tienda/enlaces'), snap => {
+    const d = snap.val() || {};
+    if(d.whatsapp) document.getElementById('enlace-whatsapp').value = d.whatsapp;
+    if(d.instagram) document.getElementById('enlace-instagram').value = d.instagram;
+    if(d.facebook) document.getElementById('enlace-facebook').value = d.facebook;
+    if(d.tiktok) document.getElementById('enlace-tiktok').value = d.tiktok;
+    if(d.email) document.getElementById('enlace-email').value = d.email;
+  });
+}
+
+async function guardarTextosHero() {
+  const { ref, update } = window._dbRefs;
+  await update(ref(window._db, 'tienda/textos'), {
+    'hero-eyebrow-txt': document.getElementById('txt-hero-eyebrow').value,
+    'hero-titulo': document.getElementById('txt-hero-titulo').value,
+    'hero-parrafo': document.getElementById('txt-hero-parrafo').value,
+  });
+  toastAdmin('Textos hero guardados ✓');
+}
+window.guardarTextosHero = guardarTextosHero;
+
+async function guardarTextosColeccion() {
+  const { ref, update } = window._dbRefs;
+  await update(ref(window._db, 'tienda/textos'), {
+    'coleccion-titulo': document.getElementById('txt-col-titulo').value,
+    'coleccion-subtitulo': document.getElementById('txt-col-subtitulo').value,
+  });
+  toastAdmin('Textos colección guardados ✓');
+}
+window.guardarTextosColeccion = guardarTextosColeccion;
+
+async function guardarTextosFooter() {
+  const { ref, update } = window._dbRefs;
+  await update(ref(window._db, 'tienda/textos'), {
+    'footer-tagline': document.getElementById('txt-footer-tagline').value,
+  });
+  toastAdmin('Footer guardado ✓');
+}
+window.guardarTextosFooter = guardarTextosFooter;
+
+async function guardarEnlaces() {
+  const { ref, set } = window._dbRefs;
+  await set(ref(window._db, 'tienda/enlaces'), {
+    whatsapp: document.getElementById('enlace-whatsapp').value.trim(),
+    instagram: document.getElementById('enlace-instagram').value.trim(),
+    facebook: document.getElementById('enlace-facebook').value.trim(),
+    tiktok: document.getElementById('enlace-tiktok').value.trim(),
+    email: document.getElementById('enlace-email').value.trim(),
+  });
+  toastAdmin('Enlaces guardados ✓');
+}
+window.guardarEnlaces = guardarEnlaces;
 
 // ─── CLIENTES ─────────────────────────────────────────────
 function cargarClientes() {
