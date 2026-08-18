@@ -26,10 +26,11 @@ function getProductos() {
     if (!r.activa) return;
     Object.entries(r.tallas||{}).forEach(([tid,t]) => {
       const id = rid+'_'+tid;
+      const unidad = t.unidad||'ml';
       prods.push({
         id, recetaId:rid, tallaId:tid,
-        nombre: r.nombre+' '+t.ml+'ml',
-        receta: r.nombre, ml: t.ml,
+        nombre: r.nombre+' '+t.ml+' '+unidad,
+        receta: r.nombre, ml: t.ml, unidad,
         precio: getPrecios()[id] !== undefined ? getPrecios()[id] : (t.precio||0),
         codigo: t.codigo||'',
         tagline: r.tagline||'',
@@ -295,9 +296,13 @@ function calcularDesglose() {
   let descCupon=0, cuponEnvioGratis=false;
   if (cuponAplicado) {
     const cData = getCupones()[cuponAplicado];
-    const pct = typeof cData==='object' ? (cData.pct||0) : (cData||0);
+    const tipo = typeof cData==='object' ? (cData.tipo||'pct') : 'pct';
+    const valor = typeof cData==='object' ? (cData.valor||cData.pct||0) : (cData||0);
     cuponEnvioGratis = typeof cData==='object' ? !!cData.envioGratis : false;
-    if (pct) descCupon = Math.round(despuesPromo*pct/100);
+    if (valor > 0) {
+      if (tipo==='monto') descCupon = Math.min(valor, despuesPromo);
+      else descCupon = Math.round(despuesPromo*valor/100);
+    }
   }
   const despuesCupon = despuesPromo - descCupon;
 
@@ -381,9 +386,12 @@ function aplicarCupon() {
   const cData = getCupones()[codigo];
   if (!cData && cData!==0) { toastTienda('Cupón no válido'); return; }
   cuponAplicado = codigo;
-  const pct = typeof cData==='object'?(cData.pct||0):(cData||0);
+  const tipo = typeof cData==='object'?(cData.tipo||'pct'):'pct';
+  const valor = typeof cData==='object'?(cData.valor||cData.pct||0):(cData||0);
   const envioG = typeof cData==='object'?!!cData.envioGratis:false;
-  const partes=[]; if(pct>0) partes.push(pct+'% descuento'); if(envioG) partes.push('envío gratis');
+  const partes=[];
+  if(valor>0) partes.push(tipo==='monto'?'$'+valor+' de descuento':valor+'% descuento');
+  if(envioG) partes.push('envío gratis');
   renderCarrito();
   toastTienda(`Cupón ${codigo}: ${partes.join(' + ')}`);
 }
