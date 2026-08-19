@@ -110,6 +110,46 @@ body{font-family:var(--sans);background:var(--crema);color:var(--carbon);min-hei
 </head>
 <body>
 
+<div id="login-wall" style="position:fixed;inset:0;background:#0A0A0A;z-index:9999;display:flex;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:10px;padding:40px 36px;width:min(360px,90vw);text-align:center">
+    <div style="font-size:36px;margin-bottom:12px">🌶️</div>
+    <div style="font-size:20px;font-weight:700;margin-bottom:6px">Doña Metiche Admin</div>
+    <div style="font-size:13px;color:#6B6862;margin-bottom:24px">Ingresa la contraseña para continuar</div>
+    <input type="password" id="admin-pwd" placeholder="Contraseña" style="width:100%;border:1px solid #D8D4CC;border-radius:6px;padding:12px 14px;font-size:15px;outline:none;margin-bottom:12px" onkeydown="if(event.key==='Enter')verificarAdmin()"/>
+    <button onclick="verificarAdmin()" style="width:100%;background:#0A0A0A;color:#fff;border:none;border-radius:5px;padding:13px;font-size:13px;font-weight:600;letter-spacing:1px;cursor:pointer">Entrar</button>
+    <div id="login-error" style="color:#8B1A1A;font-size:12px;margin-top:10px;display:none">Contraseña incorrecta</div>
+  </div>
+</div>
+
+<script>
+// CAMBIA ESTA CONTRASEÑA por una tuya
+const ADMIN_PASSWORD = 'DonaMet1che2026!';
+
+function verificarAdmin() {
+  const pwd = document.getElementById('admin-pwd').value;
+  if (pwd === ADMIN_PASSWORD) {
+    document.getElementById('login-wall').style.display = 'none';
+    sessionStorage.setItem('dm_admin_ok','1');
+  } else {
+    document.getElementById('login-error').style.display = 'block';
+    document.getElementById('admin-pwd').value = '';
+    document.getElementById('admin-pwd').focus();
+  }
+}
+
+// Si ya autenticó en esta sesión, quitar el muro
+if (sessionStorage.getItem('dm_admin_ok') === '1') {
+  document.addEventListener('DOMContentLoaded', () => {
+    const wall = document.getElementById('login-wall');
+    if (wall) wall.style.display = 'none';
+  });
+} else {
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('admin-pwd').focus();
+  });
+}
+</script>
+
 <div class="admin-header">
   <h1>Doña Metiche <span>· Admin</span></h1>
   <a href="index.html">Ver tienda →</a>
