@@ -150,30 +150,87 @@
 
   // ── SCANNER ─────────────────────────────────────────
   function iniciarScanner(inputId){
-    if(!window.ZXing){toast('Cargando escaner...');return;}
     if(scannerActivo){detenerScanner();return;}
-    const hints=new Map();
-    hints.set(window.ZXing.DecodeHintType.POSSIBLE_FORMATS,[
-      window.ZXing.BarcodeFormat.EAN_13,window.ZXing.BarcodeFormat.EAN_8,
-      window.ZXing.BarcodeFormat.CODE_128,window.ZXing.BarcodeFormat.CODE_39,
-      window.ZXing.BarcodeFormat.UPC_A]);
-    codeReader=new window.ZXing.BrowserMultiFormatReader(hints);
-    document.getElementById('scanner-overlay').style.display='flex';
+    // Verificar soporte de cámara
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+      toast('Tu dispositivo no soporta el escaner. Escribe el código manualmente.',true);
+      return;
+    }
+    window._scannerInputId=inputId;
+    const overlay=document.getElementById('scanner-overlay');
+    overlay.style.display='flex';
     scannerActivo=true;
-    codeReader.decodeFromVideoDevice(null,'scanner-video',(result)=>{
-      if(result){
-        document.getElementById(inputId).value=result.getText();
-        detenerScanner();
-        if(inputId==='pos-scan')scanAdd();
-        if(inputId==='entrada-scan')buscarEntrada();
+    const video=document.getElementById('scanner-video');
+    // Solicitar cámara trasera compatible con Safari iOS
+    navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}
+    }).then(stream=>{
+      video.srcObject=stream;
+      video.setAttribute('playsinline','');
+      video.setAttribute('autoplay','');
+      video.muted=true;
+      video.play().catch(()=>{});
+      window._scannerStream=stream;
+      // Intentar con ZXing si está disponible
+      if(window.ZXing){
+        try{
+          const hints=new Map();
+          hints.set(window.ZXing.DecodeHintType.POSSIBLE_FORMATS,[
+            window.ZXing.BarcodeFormat.EAN_13,window.ZXing.BarcodeFormat.EAN_8,
+            window.ZXing.BarcodeFormat.CODE_128,window.ZXing.BarcodeFormat.CODE_39,
+            window.ZXing.BarcodeFormat.UPC_A]);
+          codeReader=new window.ZXing.BrowserMultiFormatReader(hints);
+          codeReader.decodeFromVideoElement(video,result=>{
+            if(result){
+              const el=document.getElementById(inputId);
+              if(el)el.value=result.getText();
+              detenerScanner();
+              if(inputId==='pos-scan')scanAdd();
+              if(inputId==='entrada-scan')buscarEntrada();
+            }
+          });
+        }catch(e){console.warn('ZXing error:',e);}
+      } else {
+        // Fallback: BarcodeDetector nativo (Chrome/Android) o instrucción manual
+        if('BarcodeDetector' in window){
+          const detector=new BarcodeDetector({formats:['ean_13','ean_8','code_128','code_39','upc_a']});
+          window._detectorInterval=setInterval(async()=>{
+            if(!scannerActivo){clearInterval(window._detectorInterval);return;}
+            try{
+              const codes=await detector.detect(video);
+              if(codes.length>0){
+                const el=document.getElementById(inputId);
+                if(el)el.value=codes[0].rawValue;
+                detenerScanner();
+                if(inputId==='pos-scan')scanAdd();
+                if(inputId==='entrada-scan')buscarEntrada();
+              }
+            }catch(e){}
+          },300);
+        } else {
+          toast('Escaner no disponible en este navegador. Escribe el código.',true);
+          detenerScanner();
+        }
       }
+    }).catch(err=>{
+      console.error('Cámara error:',err);
+      toast('No se pudo acceder a la cámara. Verifica los permisos.',true);
+      detenerScanner();
     });
   }
   window.iniciarScanner=iniciarScanner;
   function detenerScanner(){
-    if(codeReader){codeReader.reset();codeReader=null;}
+    if(codeReader){try{codeReader.reset();}catch(e){}codeReader=null;}
+    if(window._detectorInterval){clearInterval(window._detectorInterval);window._detectorInterval=null;}
+    if(window._scannerStream){
+      window._scannerStream.getTracks().forEach(t=>t.stop());
+      window._scannerStream=null;
+    }
+    const video=document.getElementById('scanner-video');
+    if(video){video.srcObject=null;}
     scannerActivo=false;
-    document.getElementById('scanner-overlay').style.display='none';
+    const overlay=document.getElementById('scanner-overlay');
+    if(overlay)overlay.style.display='none';
   }
   window.detenerScanner=detenerScanner;
 
@@ -252,7 +309,7 @@
     }
     grid.innerHTML=prods.map(p=>{
       const s=getStock(p.id);
-      return '<button class="prod-btn'+(s<1?' sin-stock':'')+'" onclick="addProducto(\''+p.id+'\')">'+
+      return '<button class="prod-btn'+(s<1?' sin-stock':'')+'" data-action="addProducto" data-arg1="'+p.id+'">'+
         '<div class="p-receta">'+p.receta+'</div>'+
         '<div class="p-ml">'+p.ml+' ml</div>'+
         '<div class="p-precio">$'+p.precio+'</div>'+
@@ -815,8 +872,8 @@
       html+='<div class="cfg-receta-card" id="rcfg-'+rid+'">'+
         '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">'+
         '<input type="text" class="cfg-input" id="rname-'+rid+'" value="'+r.nombre+'" placeholder="Nombre de receta" style="flex:1"/>'+
-        '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--txt2)"><input type="checkbox" id="ract-'+rid+'" '+(r.activa?'checked':'')+' onchange="toggleRecetaActiva(\''+rid+'\')"/> Activa</label>'+
-        '<button class="btn btn-sm" style="color:var(--rojo)" onclick="eliminarReceta(\''+rid+'\')">🗑️</button>'+
+        '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--txt2)"><input type="checkbox" id="ract-'+rid+'" '+(r.activa?'checked':'')+' data-action="toggleRecetaActiva" data-arg1="'+rid+'"/> Activa</label>'+
+        '<button class="btn btn-sm" style="color:var(--rojo)" data-action="eliminarReceta" data-arg1="'+rid+'">🗑️</button>'+
         '</div>'+
         '<div class="cfg-tallas" id="tallas-'+rid+'">'+
           Object.entries(r.tallas||{}).map(([tid,t])=>`
@@ -831,12 +888,12 @@
         '<div style="display:flex;gap:6px;margin-top:10px">'+
         '<input type="number" id="new-cant-'+rid+'" placeholder="Cantidad" min="1" style="width:90px;height:33px;border:1px solid var(--borde);border-radius:var(--rsm);padding:0 8px;font-size:13px"/>'+
         '<select class="sel" id="new-unidad-'+rid+'" style="height:33px"><option value="ml">ml</option><option value="g">g</option><option value="kg">kg</option><option value="oz">oz</option><option value="L">L</option><option value="pz">pz</option></select>'+
-        '<button class="btn btn-sm btn-g" onclick="agregarTalla(\''+rid+'\')">+ Talla</button>'+
-        '<button class="btn btn-sm btn-g" onclick="guardarReceta(\''+rid+'\')">💾 Guardar</button>'+
+        '<button class="btn btn-sm btn-g" data-action="agregarTalla" data-arg1="'+rid+'">+ Talla</button>'+
+        '<button class="btn btn-sm btn-g" data-action="guardarReceta" data-arg1="'+rid+'">💾 Guardar</button>'+
         '</div>'+
       '</div>';
     });
-    html+='<button class="btn btn-g" onclick="nuevaReceta()" style="margin-top:14px;width:100%;justify-content:center">+ Nueva receta</button>';
+    html+='<button class="btn btn-g" data-action="nuevaReceta" style="margin-top:14px;width:100%;justify-content:center">+ Nueva receta</button>';
     container.innerHTML=html;
     // Config codigos (ahora integrado arriba)
     // Boton reset
@@ -914,11 +971,57 @@
   }
 
   // ── INIT ────────────────────────────────────────────
-  document.addEventListener('DOMContentLoaded',async ()=>{
+  // Exponer funciones al scope global ANTES de DOMContentLoaded para Safari
+  // Safari evalúa onclick="" antes de que el módulo termine, así que
+  // usamos un proxy que encola llamadas hasta que las funciones estén listas
+  const _pendingCalls = [];
+  window._safariFix = function(fn, args) {
+    if (window[fn]) { window[fn](...args); }
+    else { _pendingCalls.push({fn, args}); }
+  };
+
+  // Delegador de eventos para Safari — compatible con click y change
+  function _handleDelegatedEvent(e) {
+    const el = e.target.closest('[data-action]');
+    if (!el) return;
+    const action = el.dataset.action;
+    const arg1 = el.dataset.arg1;
+    const arg2 = el.dataset.arg2;
+    if (window[action]) {
+      if (arg2 !== undefined) window[action](arg1, arg2);
+      else if (arg1 !== undefined) window[action](arg1);
+      else window[action]();
+    }
+  }
+  document.addEventListener('click', _handleDelegatedEvent, true);
+  document.addEventListener('change', _handleDelegatedEvent, true);
+
+  document.addEventListener('DOMContentLoaded', async ()=>{
     await inicializarRecetasBase();
     iniciarSuscripciones();
     renderCarrito();
-    setTimeout(()=>document.getElementById('status-txt').textContent='En linea',2000);
+    // Exponer todas las funciones necesarias para Safari
+    const fns = [
+      'showTab','addProducto','scanAdd','setFilter','quitarItem','cambiarQty',
+      'actualizarDescMayoreo','onMayoTipoChange','limpiarMayoreo','abrirPago',
+      'cerrarPago','setPayTab','calcCambio','confirmarPago','cerrarTicket',
+      'imprimirTicket','buscarEntrada','confirmarEntrada','filtrarSel',
+      'entradaManual','filtrarMerma','registrarMerma','exportarCSV',
+      'renderHistorial','resetInventario','cerrarReset','confirmarReset',
+      'renderConfig','guardarReceta','toggleRecetaActiva','nuevaReceta',
+      'eliminarReceta','agregarTalla','eliminarTalla','iniciarScanner',
+      'detenerScanner','renderEnvios','abrirModalEnvio','cerrarModalEnvio',
+      'guardarEstatusEnvio','abrirWhatsApp','toggleDevolucionBox','limpiarCarrito'
+    ];
+    fns.forEach(fn => {
+      if (!window[fn]) window[fn] = (...a) => console.warn('Función no lista:', fn, a);
+    });
+    // Ejecutar llamadas pendientes
+    _pendingCalls.forEach(({fn, args}) => { if(window[fn]) window[fn](...args); });
+    setTimeout(()=>{
+      const el = document.getElementById('status-txt');
+      if(el) el.textContent='En linea';
+    },2000);
   });
 </script>
 <script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
