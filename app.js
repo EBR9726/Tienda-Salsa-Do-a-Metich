@@ -523,8 +523,11 @@ window.procesarCompraSimulada = procesarCompraSimulada;
 async function finalizarCompra(infoPago) {
   try {
     const dg = calcularDesglose();
-    const { getDatabase, ref, push, set, get } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
-    const db = getDatabase();
+    const db = window._db;
+    const { ref, push, set, get } = window._dbRefs;
+    if (!db || !ref || !push || !set || !get) {
+      throw new Error('Firebase no inicializado. Recarga la página e intenta de nuevo.');
+    }
 
     const lineas = carrito.map(c => c.promo
       ? { tipo:'promo', nombre:c.nombre, desglose:c.desglose, ml:c.ml, qty:c.qty, precioPromo:c.precio, lineas:c.lineas }
