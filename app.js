@@ -110,7 +110,7 @@ function abrirModalProducto(recetaId) {
   const r = getRecetas()[recetaId]; if (!r) return;
   const tallas = Object.entries(r.tallas||{}).sort((a,b)=>b[1].ml-a[1].ml);
   const conStock = tallas.find(([tid]) => getStock(recetaId+'_'+tid) > 0);
-  _tamanoSel = (conStock || tallas[0])?.[0] || null;
+  _tamanoSel = (conStock || tallas[0]) ? (conStock || tallas[0])[0] : null;
   _modalQty = 1;
   renderProductoActivo();
   document.getElementById('modal-producto-overlay').classList.add('open');
@@ -141,7 +141,7 @@ function renderProductoActivo() {
   const r = getRecetas()[rid]; if (!r) return;
   const tallas = Object.entries(r.tallas||{}).sort((a,b)=>b[1].ml-a[1].ml);
   if (!_tamanoSel && tallas[0]) _tamanoSel = tallas[0][0];
-  const tallaActiva = r.tallas?.[_tamanoSel];
+  const tallaActiva = r.tallas ? r.tallas[_tamanoSel] : null;
   if (!tallaActiva) return;
   const prodId = rid+'_'+_tamanoSel;
   const stock = getStock(prodId);
@@ -238,7 +238,7 @@ function verificarPromos() {
     const cfg = getPromoCfg(ml);
     if (totalUnd < cfg.cantidad) return;
     const grupos = Math.floor(totalUnd/cfg.cantidad);
-    const precioUnit = getProductos().find(p=>p.ml===ml)?.precio || 0;
+    const _pu = getProductos().find(p=>p.ml===ml); const precioUnit = _pu ? _pu.precio : 0;
     let porAsignar = grupos*cfg.cantidad;
     const lineas = [];
     for (const item of itemsML) {
@@ -381,7 +381,7 @@ function renderResumenCarrito() { if (pasoCheckout==='carrito'&&carrito.length) 
 window.renderResumenCarrito = renderResumenCarrito;
 
 function aplicarCupon() {
-  const codigo = document.getElementById('cupon-input')?.value.trim().toUpperCase();
+  const _ci = document.getElementById('cupon-input'); const codigo = _ci ? _ci.value.trim().toUpperCase() : '';
   if (!codigo) return;
   const cData = getCupones()[codigo];
   if (!cData && cData!==0) { toastTienda('Cupón no válido'); return; }
@@ -437,7 +437,7 @@ window.volverACarrito = volverACarrito;
 
 function irAPasoPago() {
   const campos = ['dc-nombre','dc-apellidos','dc-email','dc-direccion','dc-colonia','dc-cp','dc-ciudad','dc-estado'];
-  const vals = campos.map(id=>document.getElementById(id)?.value.trim());
+  const vals = campos.map(id=>{ const el=document.getElementById(id); return el ? el.value.trim() : ''; });
   if (vals.some(v=>!v)) { toastTienda('Completa todos los campos obligatorios'); return; }
   if (!vals[2].includes('@')) { toastTienda('Correo electrónico inválido'); return; }
   datosCliente = {
