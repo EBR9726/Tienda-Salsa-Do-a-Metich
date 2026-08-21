@@ -38,11 +38,11 @@
 }
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:var(--sans);background:var(--crema);color:var(--carbon);min-height:100vh}
-.admin-header{background:var(--negro);color:var(--blanco);padding:18px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.admin-header{background:var(--negro);color:var(--blanco);padding:18px 28px;display:flex;align-items:center;justify-content:space-between;position:-webkit-sticky;position:sticky;top:0;z-index:50}
 .admin-header h1{font-size:18px;font-weight:600}
 .admin-header h1 span{color:var(--naranja)}
 .admin-header a{color:rgba(250,250,248,0.6);font-size:13px;text-decoration:underline}
-.admin-nav{display:flex;gap:0;background:#fff;padding:0 20px;overflow-x:auto;border-bottom:1px solid var(--gris-claro);position:sticky;top:60px;z-index:49}
+.admin-nav{display:flex;gap:0;background:#fff;padding:0 20px;overflow-x:auto;border-bottom:1px solid var(--gris-claro);position:-webkit-sticky;position:sticky;top:60px;z-index:49}
 .admin-tab{padding:13px 15px;font-size:13px;font-weight:500;border:none;background:none;color:var(--gris);border-bottom:2.5px solid transparent;white-space:nowrap;cursor:pointer;transition:all .15s}
 .admin-tab.active{color:var(--rojo);border-bottom-color:var(--rojo)}
 .admin-panel{display:none;max-width:900px;margin:0 auto;padding:36px 20px 100px}
@@ -123,7 +123,7 @@ body{font-family:var(--sans);background:var(--crema);color:var(--carbon);min-hei
 
 <script>
 // CAMBIA ESTA CONTRASEÑA por una tuya
-const ADMIN_PASSWORD = 'PruebasMet1che2026!';
+const ADMIN_PASSWORD = 'DonaMet1che2026!';
 
 function verificarAdmin() {
   const pwd = document.getElementById('admin-pwd').value;
@@ -778,86 +778,144 @@ const COLORES_SECCIONES = [
   {id:'colorFooterBg',label:'Fondo Footer',def:'#1C1C1A'},
 ];
 
+function renderColorField(c) {
+  return `
+    <div class="field">
+      <label style="font-size:11px;font-weight:700;color:var(--gris);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;display:block">${c.label}</label>
+      <div style="display:flex;align-items:center;gap:10px;background:#f7f5f2;border:1px solid var(--gris-claro);border-radius:8px;padding:10px">
+        <input type="color" id="cp-${c.id}" value="${c.def}" style="width:44px;height:44px;border:none;border-radius:6px;cursor:pointer;background:none"/>
+        <div style="flex:1">
+          <div style="font-size:11px;color:var(--gris);margin-bottom:4px">Hex</div>
+          <input type="text" id="hex-${c.id}" value="${c.def}" maxlength="7" style="width:100%;border:1px solid var(--gris-claro);border-radius:5px;padding:7px 10px;font-family:monospace;font-size:13px;background:#fff"/>
+        </div>
+        <div style="width:36px;height:36px;border-radius:6px;border:1px solid var(--gris-claro);background:${c.def}" id="prev-color-${c.id}"></div>
+      </div>
+    </div>`;
+}
+
 function cargarDiseno() {
-  // Llenar selects de fuentes
-  ['fuente-titulos','fuente-cuerpo','fuente-precios','fuente-botones'].forEach(id => {
+  // Llenar selects de fuentes con opciones legibles
+  const selFuentes = {
+    'fuente-titulos': 'Fuente de títulos principales (h1, h2, nombre de receta...)',
+    'fuente-cuerpo':  'Fuente de párrafos y descripciones',
+    'fuente-precios': 'Fuente de precios',
+    'fuente-botones': 'Fuente de botones y etiquetas'
+  };
+  Object.entries(selFuentes).forEach(([id, descripcion]) => {
     const sel = document.getElementById(id); if(!sel) return;
     sel.innerHTML = FUENTES_LIST.map(f=>`<option value="${f}">${f}</option>`).join('');
     sel.addEventListener('change', actualizarPreviewFuentes);
   });
-  // Generar grids de colores
+
+  // Generar grids de colores con preview visual
   const gg = document.getElementById('colores-globales-grid');
-  if(gg) gg.innerHTML = COLORES_GLOBALES.map(c=>`
-    <div class="field"><label>${c.label}</label>
-      <div style="display:flex;align-items:center;gap:8px">
-        <input type="color" id="cp-${c.id}" value="${c.def}" style="width:46px;height:38px;padding:2px;border:1px solid var(--gris-claro);border-radius:5px;cursor:pointer" oninput="syncHex('${c.id}')"/>
-        <input type="text" id="hex-${c.id}" value="${c.def}" style="flex:1;border:1px solid var(--gris-claro);border-radius:5px;padding:9px;font-family:monospace;font-size:13px" oninput="syncPicker('${c.id}')"/>
-      </div>
-    </div>`).join('');
+  if(gg) gg.innerHTML = COLORES_GLOBALES.map(c=>renderColorField(c)).join('');
   const gs = document.getElementById('colores-secciones-grid');
-  if(gs) gs.innerHTML = COLORES_SECCIONES.map(c=>`
-    <div class="field"><label>${c.label}</label>
-      <div style="display:flex;align-items:center;gap:8px">
-        <input type="color" id="cp-${c.id}" value="${c.def}" style="width:46px;height:38px;padding:2px;border:1px solid var(--gris-claro);border-radius:5px;cursor:pointer" oninput="syncHex('${c.id}')"/>
-        <input type="text" id="hex-${c.id}" value="${c.def}" style="flex:1;border:1px solid var(--gris-claro);border-radius:5px;padding:9px;font-family:monospace;font-size:13px" oninput="syncPicker('${c.id}')"/>
-      </div>
-    </div>`).join('');
+  if(gs) gs.innerHTML = COLORES_SECCIONES.map(c=>renderColorField(c)).join('');
+
+  // Vincular eventos de color con addEventListener (compatible Safari)
+  [...COLORES_GLOBALES,...COLORES_SECCIONES].forEach(c => {
+    const picker = document.getElementById('cp-'+c.id);
+    const hexInput = document.getElementById('hex-'+c.id);
+    const preview = document.getElementById('prev-color-'+c.id);
+    if(picker) {
+      picker.addEventListener('input', () => {
+        if(hexInput) hexInput.value = picker.value;
+        if(preview) preview.style.background = picker.value;
+      });
+      picker.addEventListener('change', () => {
+        if(hexInput) hexInput.value = picker.value;
+        if(preview) preview.style.background = picker.value;
+      });
+    }
+    if(hexInput) {
+      hexInput.addEventListener('input', () => {
+        const v = hexInput.value;
+        if(/^#[0-9A-Fa-f]{6}$/.test(v)) {
+          if(picker) picker.value = v;
+          if(preview) preview.style.background = v;
+        }
+      });
+    }
+  });
 
   const { ref, onValue } = window._dbRefs;
   onValue(ref(window._db, 'tienda/diseno'), snap => {
     disenoData = snap.val() || {};
-    // Fuentes
-    ['fuenteTitulos','fuenteCuerpo','fuentePrecios','fuenteBotones'].forEach(k=>{
-      const mapId={'fuenteTitulos':'fuente-titulos','fuenteCuerpo':'fuente-cuerpo','fuentePrecios':'fuente-precios','fuenteBotones':'fuente-botones'};
-      const el=document.getElementById(mapId[k]); if(el&&disenoData[k]) el.value=disenoData[k];
+    // Cargar fuentes guardadas
+    const mapFuentes = {
+      fuenteTitulos:'fuente-titulos',
+      fuenteCuerpo:'fuente-cuerpo',
+      fuentePrecios:'fuente-precios',
+      fuenteBotones:'fuente-botones'
+    };
+    Object.entries(mapFuentes).forEach(([k,id]) => {
+      const el = document.getElementById(id);
+      if(el && disenoData[k]) el.value = disenoData[k];
     });
-    // Colores
-    [...COLORES_GLOBALES,...COLORES_SECCIONES].forEach(c=>{
-      if(disenoData[c.id]){
-        const p=document.getElementById('cp-'+c.id),h=document.getElementById('hex-'+c.id);
-        if(p)p.value=disenoData[c.id]; if(h)h.value=disenoData[c.id];
+    // Cargar colores guardados
+    [...COLORES_GLOBALES,...COLORES_SECCIONES].forEach(c => {
+      if(disenoData[c.id]) {
+        const p = document.getElementById('cp-'+c.id);
+        const h = document.getElementById('hex-'+c.id);
+        const pv = document.getElementById('prev-color-'+c.id);
+        if(p) p.value = disenoData[c.id];
+        if(h) h.value = disenoData[c.id];
+        if(pv) pv.style.background = disenoData[c.id];
       }
     });
     actualizarPreviewFuentes();
   });
 }
 
-function syncHex(id){ const p=document.getElementById('cp-'+id),h=document.getElementById('hex-'+id); if(p&&h)h.value=p.value; }
-function syncPicker(id){ const p=document.getElementById('cp-'+id),h=document.getElementById('hex-'+id); if(p&&h&&/^#[0-9A-Fa-f]{6}$/.test(h.value))p.value=h.value; }
-window.syncHex=syncHex; window.syncPicker=syncPicker;
+function actualizarPreviewFuentes() {
+  const vals = {
+    titulo:  document.getElementById('fuente-titulos')?.value || 'Fraunces',
+    cuerpo:  document.getElementById('fuente-cuerpo')?.value  || 'Inter',
+    precio:  document.getElementById('fuente-precios')?.value || 'Fraunces',
+    boton:   document.getElementById('fuente-botones')?.value || 'Inter',
+  };
+  const map = {
+    'prev-titulo': vals.titulo,
+    'prev-cuerpo': vals.cuerpo,
+    'prev-precio': vals.precio,
+  };
+  Object.entries(map).forEach(([id,font]) => {
+    const el = document.getElementById(id);
+    if(el) el.style.fontFamily = "'" + font + "',serif";
+  });
+  const pb = document.getElementById('prev-boton');
+  if(pb) pb.style.fontFamily = "'" + vals.boton + "',sans-serif";
 
-function actualizarPreviewFuentes(){
-  const ft=document.getElementById('fuente-titulos')?.value||'Fraunces';
-  const fc=document.getElementById('fuente-cuerpo')?.value||'Inter';
-  const fp=document.getElementById('fuente-precios')?.value||'Fraunces';
-  const fb=document.getElementById('fuente-botones')?.value||'Inter';
-  const pt=document.getElementById('prev-titulo'); if(pt)pt.style.fontFamily=ft+',serif';
-  const pc=document.getElementById('prev-cuerpo'); if(pc)pc.style.fontFamily=fc+',sans-serif';
-  const pp=document.getElementById('prev-precio'); if(pp)pp.style.fontFamily=fp+',serif';
-  const pb=document.getElementById('prev-boton'); if(pb)pb.style.fontFamily=fb+',sans-serif';
-  // cargar Google Fonts del preview
-  ['fuente-titulos','fuente-cuerpo','fuente-precios','fuente-botones'].forEach((selId,i)=>{
-    const val=document.getElementById(selId)?.value; if(!val)return;
-    const linkId='gf-preview-'+i; let lk=document.getElementById(linkId);
-    if(!lk){lk=document.createElement('link');lk.rel='stylesheet';lk.id=linkId;document.head.appendChild(lk);}
-    lk.href='https://fonts.googleapis.com/css2?family='+val.replace(/ /g,'+')+'&display=swap';
+  // Cargar Google Fonts para preview
+  Object.values(vals).forEach((font, i) => {
+    const linkId = 'gf-adm-' + i;
+    let lk = document.getElementById(linkId);
+    if(!lk) { lk = document.createElement('link'); lk.rel='stylesheet'; lk.id=linkId; document.head.appendChild(lk); }
+    lk.href = 'https://fonts.googleapis.com/css2?family=' + font.replace(/ /g,'+') + ':wght@400;600&display=swap';
   });
 }
-window.actualizarPreviewFuentes=actualizarPreviewFuentes;
+window.actualizarPreviewFuentes = actualizarPreviewFuentes;
 
 async function guardarDiseno() {
   const { ref, set } = window._dbRefs;
   const data = {
-    fuenteTitulos: document.getElementById('fuente-titulos')?.value||'Fraunces',
-    fuenteCuerpo: document.getElementById('fuente-cuerpo')?.value||'Inter',
-    fuentePrecios: document.getElementById('fuente-precios')?.value||'Fraunces',
-    fuenteBotones: document.getElementById('fuente-botones')?.value||'Inter',
+    fuenteTitulos: document.getElementById('fuente-titulos')?.value || 'Fraunces',
+    fuenteCuerpo:  document.getElementById('fuente-cuerpo')?.value  || 'Inter',
+    fuentePrecios: document.getElementById('fuente-precios')?.value || 'Fraunces',
+    fuenteBotones: document.getElementById('fuente-botones')?.value || 'Inter',
   };
-  [...COLORES_GLOBALES,...COLORES_SECCIONES].forEach(c=>{
-    const el=document.getElementById('hex-'+c.id); if(el)data[c.id]=el.value;
+  [...COLORES_GLOBALES,...COLORES_SECCIONES].forEach(c => {
+    const el = document.getElementById('hex-'+c.id);
+    if(el && el.value) data[c.id] = el.value;
   });
-  await set(ref(window._db, 'tienda/diseno'), data);
-  toastAdmin('Diseño guardado ✓');
+  try {
+    await set(ref(window._db, 'tienda/diseno'), data);
+    toastAdmin('Diseño guardado ✓ — recarga la tienda para ver los cambios');
+  } catch(e) {
+    console.error(e);
+    toastAdmin('Error guardando: ' + e.message);
+  }
 }
 window.guardarDiseno = guardarDiseno;
 
