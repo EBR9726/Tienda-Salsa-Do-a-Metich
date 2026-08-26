@@ -570,15 +570,14 @@ async function finalizarCompra(infoPago) {
 
     console.log('PASO 3: guardando cliente...');
     const cKey = datosCliente.email.replace(/[.#$[\]]/g,'_');
-    const prevSnap = await get(ref(db,'clientes/'+cKey));
-    const prev = prevSnap.val()||{};
-    await set(ref(db,'clientes/'+cKey), {
+    // Usar update en lugar de get+set para no necesitar permiso de lectura
+    const { update } = window._dbRefs;
+    await update(ref(db,'clientes/'+cKey), {
       nombre:datosCliente.nombre, apellidos:datosCliente.apellidos,
       email:datosCliente.email, telefono:datosCliente.telefono||'',
       direccion:datosCliente.direccion, colonia:datosCliente.colonia,
       cp:datosCliente.cp, ciudad:datosCliente.ciudad, estado:datosCliente.estado,
-      ultimaCompra:new Date().toISOString(),
-      totalCompras:(prev.totalCompras||0)+1
+      ultimaCompra:new Date().toISOString()
     });
     console.log('PASO 3 OK');
 
