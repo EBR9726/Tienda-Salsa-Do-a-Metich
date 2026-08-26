@@ -569,17 +569,20 @@ async function finalizarCompra(infoPago) {
     console.log('PASO 2 OK');
 
     console.log('PASO 3: guardando cliente...');
-    const cKey = datosCliente.email.replace(/[.#$[\]]/g,'_');
-    // Usar update en lugar de get+set para no necesitar permiso de lectura
-    const { update } = window._dbRefs;
-    await update(ref(db,'clientes/'+cKey), {
-      nombre:datosCliente.nombre, apellidos:datosCliente.apellidos,
-      email:datosCliente.email, telefono:datosCliente.telefono||'',
-      direccion:datosCliente.direccion, colonia:datosCliente.colonia,
-      cp:datosCliente.cp, ciudad:datosCliente.ciudad, estado:datosCliente.estado,
-      ultimaCompra:new Date().toISOString()
-    });
-    console.log('PASO 3 OK');
+    try {
+      const cKey = datosCliente.email.replace(/[.#$[\]]/g,'_');
+      await set(ref(db,'clientes/'+cKey), {
+        nombre:datosCliente.nombre, apellidos:datosCliente.apellidos,
+        email:datosCliente.email, telefono:datosCliente.telefono||'',
+        direccion:datosCliente.direccion, colonia:datosCliente.colonia,
+        cp:datosCliente.cp, ciudad:datosCliente.ciudad, estado:datosCliente.estado,
+        ultimaCompra:new Date().toISOString()
+      });
+      console.log('PASO 3 OK');
+    } catch(eCliente) {
+      console.warn('Cliente no guardado (permiso):', eCliente.message);
+      // Continuar aunque falle guardar el cliente
+    }
 
     await enviarCorreoConfirmacion(entry);
     mostrarTicket(entry);
