@@ -544,22 +544,31 @@ async function finalizarCompra(infoPago) {
       cliente:datosCliente, fecha:new Date().toISOString()
     };
 
-    await push(ref(db,'historial'), entry);
+    function limpiarObj(obj) {
+      return JSON.parse(JSON.stringify(obj, (k,v) => v === undefined ? null : v));
+    }
 
-    // Descontar inventario
+    console.log('PASO 1: escribiendo historial...');
+    await push(ref(db,'historial'), limpiarObj(entry));
+    console.log('PASO 1 OK');
+
+    console.log('PASO 2: descontando inventario...');
     for (const c of carrito) {
       if (c.promo && c.lineas) {
         for (const l of c.lineas) {
+          console.log('inventario promo id:', l.id);
           const s = await get(ref(db,'inventario/'+l.id)).then(s=>s.val()||0);
           await set(ref(db,'inventario/'+l.id), Math.max(0, s-l.qty*c.qty));
         }
       } else if (!c.promo) {
+        console.log('inventario normal id:', c.id);
         const s = await get(ref(db,'inventario/'+c.id)).then(s=>s.val()||0);
         await set(ref(db,'inventario/'+c.id), Math.max(0, s-c.qty));
       }
     }
+    console.log('PASO 2 OK');
 
-    // Guardar cliente
+    console.log('PASO 3: guardando cliente...');
     const cKey = datosCliente.email.replace(/[.#$[\]]/g,'_');
     const prevSnap = await get(ref(db,'clientes/'+cKey));
     const prev = prevSnap.val()||{};
@@ -571,6 +580,7 @@ async function finalizarCompra(infoPago) {
       ultimaCompra:new Date().toISOString(),
       totalCompras:(prev.totalCompras||0)+1
     });
+    console.log('PASO 3 OK');
 
     await enviarCorreoConfirmacion(entry);
     mostrarTicket(entry);
